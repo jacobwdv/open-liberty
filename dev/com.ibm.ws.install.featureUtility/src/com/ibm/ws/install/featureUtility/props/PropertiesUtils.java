@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2021 IBM Corporation and others.
+ * Copyright (c) 2020, 2023 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,7 @@
 package com.ibm.ws.install.featureUtility.props;
 
 import com.ibm.ws.install.InstallConstants;
+import com.ibm.ws.install.InstallConstants.VerifyOption;
 import com.ibm.ws.install.InstallException;
 import com.ibm.ws.install.RepositoryConfigValidationResult;
 import com.ibm.ws.install.internal.InstallLogUtils;
@@ -54,8 +55,14 @@ public class PropertiesUtils {
     public final static String PROXY_PASSWORD = "proxyPassword";
     public final static String FEATURE_LOCAL_REPO = "featureLocalRepo";
     public final static String FEATURES_BOM = ".featuresbom";
+    public final static String FEATURE_VERIFY = "feature.verify";
     public final static String EQUALS = "=";
-    private final static String[] SUPPORTED_KEYS = { USE_WLP_REPO, PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASSWORD, FEATURE_LOCAL_REPO };
+    private static final String UBUNTU_HOST = "keyserver.ubuntu.com";
+    private static final String PGP_HOST = "keys.openpgp.org";
+    private static final String MIT_HOST = "pgp.mit.edu";
+    private final static String[] SUPPORTED_KEYS = { USE_WLP_REPO, PROXY_HOST, PROXY_PORT, PROXY_USER, PROXY_PASSWORD,
+	    FEATURE_LOCAL_REPO, FEATURE_VERIFY };
+    private final static String[] SUPPORTED_KEYSERVERS = { UBUNTU_HOST, PGP_HOST, MIT_HOST };
     private static final Logger logger = Logger.getLogger(InstallConstants.LOGGER_NAME);
 
 
@@ -167,17 +174,29 @@ public class PropertiesUtils {
                                     configMap.get(PROXY_HOST))));
                         }
                     }
-                } else {
-                    if (configMap.containsKey(PROXY_PORT) || configMap.containsKey(PROXY_USER) || configMap.containsKey(PROXY_PASSWORD)) {
-                        int ln = 0;
-                        if (lineMap.containsKey(PROXY_PORT))
-                            ln = lineMap.get(PROXY_PORT);
-                        else if (lineMap.containsKey(PROXY_USER))
-                            ln = lineMap.get(PROXY_USER);
-                        else
-                            ln = lineMap.get(PROXY_PASSWORD);
-                        validationResults.add(new RepositoryConfigValidationResult(ln, RepositoryConfigValidationResult.ValidationFailedReason.MISSING_HOST, InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("MSG_VALIDATION_MISSING_HOST")));
-                    }
+                } else if (configMap.containsKey(PROXY_PORT) || configMap.containsKey(PROXY_USER) || configMap.containsKey(PROXY_PASSWORD)) {
+                    int ln = 0;
+                    if (lineMap.containsKey(PROXY_PORT))
+                        ln = lineMap.get(PROXY_PORT);
+                    else if (lineMap.containsKey(PROXY_USER))
+                        ln = lineMap.get(PROXY_USER);
+                    else
+                        ln = lineMap.get(PROXY_PASSWORD);
+                    validationResults.add(new RepositoryConfigValidationResult(ln, RepositoryConfigValidationResult.ValidationFailedReason.MISSING_HOST, InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("MSG_VALIDATION_MISSING_HOST")));
+		}
+		/*
+		 * Check if key ID exists for the keyserver
+		 */
+		if (!FeatureUtilityProperties.getKeyMap().isEmpty()) {
+		    for (String keyName : FeatureUtilityProperties.getKeyMap().keySet()) {
+			if (FeatureUtilityProperties.getKeyMap().get(keyName).get(InstallConstants.KEYID_QUALIFIER) == null) {
+			    int ln = lineMap.get(keyName + "." + InstallConstants.KEYSERVER_QUALIFIER);
+			    validationResults.add(new RepositoryConfigValidationResult(ln,
+				    RepositoryConfigValidationResult.ValidationFailedReason.MISSING_KEYID,
+				    InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES
+					    .getLogMessage("MSG_VALIDATION_MISSING_KEYID")));
+			}
+		    }
                 }
             } catch (IOException e) {
                 throw new InstallException(InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_TOOL_REPOSITORY_PROPS_NOT_LOADED",
@@ -205,7 +224,8 @@ public class PropertiesUtils {
         if (Arrays.asList(SUPPORTED_KEYS).contains(key))
             return true;
         if (key.endsWith(URL_SUFFIX)  ||
-                key.endsWith(USER_SUFFIX) || key.endsWith(PWD_SUFFIX) || key.endsWith(FEATURES_BOM))
+		key.endsWith(USER_SUFFIX) || key.endsWith(PWD_SUFFIX) || key.endsWith(FEATURES_BOM)
+		|| key.endsWith(InstallConstants.KEYID_QUALIFIER) || key.endsWith(InstallConstants.KEYSERVER_QUALIFIER))
             return true;
         return false;
     }
@@ -248,11 +268,27 @@ public class PropertiesUtils {
                 String repoName = keyValue[0].substring(0, keyValue[0].length() - suffix.length()).trim();
                 //Check for empty repository names
                 if (repoName.isEmpty()) {
-//                    logger.log(Level.FINE, InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("LOG_NO_REPO_NAME", line));
                     validationResults.add(new RepositoryConfigValidationResult(lineNum, RepositoryConfigValidationResult.ValidationFailedReason.MISSING_REPONAME, InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("MSG_VALIDATION_EMPTY_REPONAME")));
                     return;
                 }
             }
+
+	    /**
+	     * emptyKeyName
+	     */
+	    if (key.endsWith(URL_SUFFIX) || key.endsWith(PWD_SUFFIX) || key.endsWith(USER_SUFFIX)) {
+		int suffixIndex = key.lastIndexOf(".");
+		String suffix = key.substring(suffixIndex);
+		String keyName = keyValue[0].substring(0, keyValue[0].length() - suffix.length()).trim();
+		// Check for empty key names
+		if (keyName.isEmpty()) {
+		    validationResults.add(new RepositoryConfigValidationResult(lineNum,
+			    RepositoryConfigValidationResult.ValidationFailedReason.MISSING_PUBKEY_NAME,
+			    InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES
+				    .getLogMessage("MSG_VALIDATION_EMPTY_PUBKEY_NAME")));
+		    return;
+		}
+	    }
 
             /**
              * duplicate keys
@@ -285,7 +321,7 @@ public class PropertiesUtils {
                 }
             }
 
-            if (key.endsWith(URL_SUFFIX)) {
+	    if (key.endsWith(URL_SUFFIX) || key.endsWith(InstallConstants.KEYSERVER_QUALIFIER)) {
                 /**
                  * invalid url
                  *
@@ -306,6 +342,26 @@ public class PropertiesUtils {
                                     value)));
                             return;
                         }
+			/*
+			 * Check keyserver
+			 */
+			if (key.endsWith(InstallConstants.KEYSERVER_QUALIFIER)
+				&& (protocol.equalsIgnoreCase("http") || protocol.equalsIgnoreCase("https"))) {
+			    boolean isSupported = false;
+			    for (String server : SUPPORTED_KEYSERVERS) {
+				if (url.toLowerCase().contains(server)) {
+				    isSupported = true;
+				    break;
+				}
+			    }
+			    if (!isSupported) {
+				validationResults.add(new RepositoryConfigValidationResult(lineNum,
+					RepositoryConfigValidationResult.ValidationFailedReason.INVALID_KEYSERVER,
+					InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES
+						.getLogMessage("MSG_VALIDATION_UNSUPPORT_KERYSERVER", url)));
+				return;
+			    }
+			}
                     }
 
                 } catch (MalformedURLException e) {
@@ -315,6 +371,37 @@ public class PropertiesUtils {
                 }
 
             }
+
+	    /*
+	     * / feature verify can be "enforce", "warn", "skip", or "all".
+	     */
+	    if (key.equals(FEATURE_VERIFY)) {
+		try {
+		    VerifyOption.valueOf(value.toLowerCase());
+		} catch (Exception e) {
+		    validationResults.add(new RepositoryConfigValidationResult(lineNum,
+			    RepositoryConfigValidationResult.ValidationFailedReason.INVALID_VALUE,
+			    InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES
+				    .getLogMessage("MSG_VALIDATION_INVALID_VERIFY_OPTION", value)));
+		    return;
+		}
+	    }
+
+	    /*
+	     * / key id should be long 64 bits or 32 bits(not recommended)
+	     */
+	    if (key.endsWith(InstallConstants.KEYID_QUALIFIER)) {
+		if (value.startsWith("0x")) {
+		    value = value.substring(2);
+		}
+		if (value.length() != 16 && value.length() != 8) {
+		    validationResults.add(new RepositoryConfigValidationResult(lineNum,
+			    RepositoryConfigValidationResult.ValidationFailedReason.INVALID_KEYID,
+			    InstallLogUtils.Messages.INSTALL_KERNEL_MESSAGES
+				    .getLogMessage("MSG_VALIDATION_INVALID_KEYID", value)));
+		    return;
+		}
+	    }
 
             /**
              * port number is between 1-65535

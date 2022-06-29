@@ -1,10 +1,10 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2022 IBM Corporation and others.
+ * Copyright (c) 2020, 2023 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -156,11 +156,17 @@ public class ArtifactDownloaderUtils {
         }
     }
 
-    public static void acquireFeatureURLs(List<String> mavenCoords, String repo, Map<String, String> urltoMavenCoord) {
+    public static void acquireFeatureURLs(List<String> mavenCoords, String repo, Map<String, String> urltoMavenCoord, String verifyOption, boolean downloadAll) {
         for (String coord : mavenCoords) {
             String url = getUrlLocation(repo, coord);
-            urltoMavenCoord.put(url + ".esa", coord);
-            urltoMavenCoord.put(url + ".pom", coord);
+            if (downloadAll) {
+                urltoMavenCoord.put(url + ".esa", coord);
+                urltoMavenCoord.put(url + ".pom", coord);
+            }
+            if (verifyOption != null) {
+                urltoMavenCoord.put(url + ".esa.asc", coord);
+                urltoMavenCoord.put(url + ".pom.asc", coord);
+            }
         }
     }
 

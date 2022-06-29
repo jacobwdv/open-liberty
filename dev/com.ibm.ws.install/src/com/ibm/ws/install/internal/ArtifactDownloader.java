@@ -1,10 +1,10 @@
 /*******************************************************************************
- * Copyright (c) 2020, 2022 IBM Corporation and others.
+ * Copyright (c) 2020, 2023 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -87,14 +87,14 @@ public class ArtifactDownloader implements AutoCloseable {
         });
     }
 
-    public Set<String> getMissingFeaturesFromRepo(List<String> mavenCoords, MavenRepository repository) throws InstallException {
+    public Set<String> getMissingFeaturesFromRepo(List<String> mavenCoords, MavenRepository repository, String verifyOption, boolean downloadAll) throws InstallException {
         info(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("STATE_CONTACTING_MAVEN_REPO"));
 
         String repo = FormatUrlSuffix(repository.getRepositoryUrl());
         Map<String, String> URLtoMavenCoordMap = new HashMap<>();
-        ArtifactDownloaderUtils.acquireFeatureURLs(mavenCoords, repo, URLtoMavenCoordMap);
+        ArtifactDownloaderUtils.acquireFeatureURLs(mavenCoords, repo, URLtoMavenCoordMap, verifyOption, downloadAll);
         List<String> missingFeaturesURLs;
-        Set<String> missingCoords = new HashSet<String>();
+        Set<String> missingCoords = new HashSet<>();
 
         if (!testConnection(repository)) {
             throw ExceptionUtils.createByKey("ERROR_FAILED_TO_CONNECT_MAVEN");
@@ -123,16 +123,29 @@ public class ArtifactDownloader implements AutoCloseable {
         return missingCoords;
     }
 
-    public void synthesizeAndDownloadFeatures(List<String> mavenCoords, String dLocation, MavenRepository repository) throws InstallException {
+    public void synthesizeAndDownloadFeatures(List<String> mavenCoords, String dLocation, MavenRepository repository, String verifyOptiion,
+                                              boolean downloadAll) throws InstallException {
         final List<Future<?>> futures = new ArrayList<>();
-        // we have downloaded mavenCoords.length * 2 (esa and pom) amount of features.
-        double individualSize = progressBar.getMethodIncrement("downloadArtifacts") / (2 * mavenCoords.size());
+        double individualSize = 0;
         info(Messages.INSTALL_KERNEL_MESSAGES.getMessage("MSG_BEGINNING_DOWNLOAD_FEATURES"));
         for (String coords : mavenCoords) {
-            Future<?> future1 = submitDownloadRequest(coords, "esa", dLocation, repository);
-            futures.add(future1);
-            Future<?> future2 = submitDownloadRequest(coords, "pom", dLocation, repository);
-            futures.add(future2);
+            Future<?> future;
+            if (downloadAll) {
+                // we have downloaded mavenCoords.length * 2 (esa and pom) amount of features.
+                individualSize = progressBar.getMethodIncrement("downloadArtifacts") / (2 * mavenCoords.size());
+                future = submitDownloadRequest(coords, "esa", dLocation, repository);
+                futures.add(future);
+                future = submitDownloadRequest(coords, "pom", dLocation, repository);
+                futures.add(future);
+            }
+            if (verifyOptiion != null) {
+                // we have downloaded mavenCoords.length * 4 (esa,asc and poms) amount of features.
+                individualSize = progressBar.getMethodIncrement("downloadArtifacts") / (4 * mavenCoords.size());
+                future = submitDownloadRequest(coords, "esa.asc", dLocation, repository);
+                futures.add(future);
+                future = submitDownloadRequest(coords, "pom.asc", dLocation, repository);
+                futures.add(future);
+            }
         }
 
         while (!futures.isEmpty()) {
@@ -479,7 +492,7 @@ public class ArtifactDownloader implements AutoCloseable {
      * @return esaFiles
      */
     public List<File> getDownloadedEsas(List<String> featureList) {
-        List<File> esaFiles = new ArrayList<File>();
+        List<File> esaFiles = new ArrayList<>();
         for (String coord : featureList) {
             //return downloaded esa files in the same order as featureList
             File artifactPath = mavenCoordMap.get(coord);
@@ -490,8 +503,18 @@ public class ArtifactDownloader implements AutoCloseable {
         return esaFiles;
     }
 
+    public List<File> getDownloadedAscs() {
+        List<File> ascFiles = new ArrayList<>();
+        for (File f : downloadedFiles) {
+            if (f.getName().endsWith(".asc")) {
+                ascFiles.add(f);
+            }
+        }
+        return ascFiles;
+    }
+
     public List<File> getDownloadedPoms() {
-        List<File> pomFiles = new ArrayList<File>();
+        List<File> pomFiles = new ArrayList<>();
         for (File f : downloadedFiles) {
             if (f.getName().endsWith(".pom")) {
                 pomFiles.add(f);
