@@ -12,6 +12,9 @@
  *******************************************************************************/
 package io.openliberty.data.internal.persistence;
 
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
@@ -37,16 +40,8 @@ import com.ibm.wsspi.kernel.service.utils.FilterUtils;
 import com.ibm.wsspi.persistence.DatabaseStore;
 import com.ibm.wsspi.persistence.PersistenceServiceUnit;
 
-import jakarta.data.Column;
-import jakarta.data.DiscriminatorColumn;
-import jakarta.data.DiscriminatorValue;
-import jakarta.data.Embeddable;
-import jakarta.data.Entity;
-import jakarta.data.Generated;
-import jakarta.data.Id;
-import jakarta.data.Inheritance;
-import jakarta.data.MappedSuperclass;
 import jakarta.data.exceptions.MappingException;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.Attribute.PersistentAttributeType;
@@ -73,97 +68,6 @@ class EntityDefiner implements Runnable {
         this.databaseId = databaseId;
         this.loader = loader;
         this.entities = entities;
-    }
-
-    /**
-     * It's more likely for a name ending with "Id" or "ID"
-     * to be an id than a name ending with "id",
-     * unless the name is "id".
-     *
-     * Precedence is:
-     * Select the field/parameter/method that is annotated with @Id, (1)
-     * or lacking that is named Id, or ID, or id, (2)
-     * or lacking that has a name that ends with Id (3), ID (4), or id (5).
-     *
-     * @param entityClass entity class.
-     * @return name of id property.
-     * @throws MappingException if the id property cannot be inferred.
-     */
-    private static String getID(Class<?> entityClass) {
-        int precedence = 10;
-        String id = null;
-
-        for (Field field : entityClass.getFields()) {
-            String name = field.getName();
-
-            if (field.getAnnotation(Id.class) != null)
-                return name;
-
-            if (precedence > 2)
-                if (name.length() > 2) {
-                    if (precedence > 3) {
-                        char i = name.charAt(name.length() - 2);
-                        if (i == 'I') {
-                            char d = name.charAt(name.length() - 1);
-                            if (d == 'd') {
-                                id = name;
-                                precedence = 3;
-                            } else if (d == 'D' && precedence > 4) {
-                                id = name;
-                                precedence = 4;
-                            }
-                        } else if (i == 'i' && precedence > 5 && name.charAt(name.length() - 1) == 'd') {
-                            id = name;
-                            precedence = 5;
-                        }
-                    }
-                } else if (name.equalsIgnoreCase("ID")) {
-                    id = name;
-                    precedence = 2;
-                }
-        }
-
-        // TODO record parameters
-
-        for (Method method : entityClass.getMethods()) {
-            String name = method.getName();
-            if (name.startsWith("get"))
-                name = name.substring(3);
-            else if (name.startsWith("is"))
-                name = name.substring(2);
-            else
-                continue;
-
-            if (method.getAnnotation(Id.class) != null)
-                return name;
-
-            if (precedence > 2)
-                if (name.length() > 2) {
-                    if (precedence > 3) {
-                        char i = name.charAt(name.length() - 2);
-                        if (i == 'I') {
-                            char d = name.charAt(name.length() - 1);
-                            if (d == 'd') {
-                                id = name;
-                                precedence = 3;
-                            } else if (d == 'D' && precedence > 4) {
-                                id = name;
-                                precedence = 4;
-                            }
-                        } else if (i == 'i' && precedence > 5 && name.charAt(name.length() - 1) == 'd') {
-                            id = name;
-                            precedence = 5;
-                        }
-                    }
-                } else if (name.equalsIgnoreCase("ID")) {
-                    id = name;
-                    precedence = 2;
-                }
-        }
-
-        if (id == null)
-            throw new MappingException(entityClass + " lacks public field with @Id or of the form *ID"); // TODO
-        return id;
     }
 
     @Override
@@ -193,29 +97,13 @@ class EntityDefiner implements Runnable {
             // XML to make all other classes into JPA entities:
             ArrayList<String> entityClassInfo = new ArrayList<>(entities.size());
 
-            List<Class<?>> embeddableTypes = new ArrayList<>();
-
             for (Class<?> c : entities) {
-                if (c.getAnnotation(jakarta.persistence.Entity.class) == null) {
-                    Entity entity = c.getAnnotation(Entity.class);
-                    StringBuilder xml = new StringBuilder(500).append(" <entity class=\"" + c.getName() + "\">").append(EOLN);
+                if (c.getAnnotation(Entity.class) == null) {
+                    StringBuilder xml = new StringBuilder(500).append(" <entity class=\"").append(c.getName()).append("\">").append(EOLN);
 
-                    if (c.getAnnotation(Inheritance.class) == null) {
-                        String tableName = tablePrefix + (entity == null || entity.value().length() == 0 ? c.getSimpleName() : entity.value());
-                        xml.append("  <table name=\"" + tableName + "\"/>").append(EOLN);
-                    } else {
-                        xml.append("  <inheritance strategy=\"SINGLE_TABLE\"/>").append(EOLN);
-                    }
+                    xml.append("  <table name=\"").append(tablePrefix).append(c.getSimpleName()).append("\"/>").append(EOLN);
 
-                    DiscriminatorValue discriminatorValue = c.getAnnotation(DiscriminatorValue.class);
-                    if (discriminatorValue != null)
-                        xml.append("  <discriminator-value>").append(discriminatorValue.value()).append("</discriminator-value>").append(EOLN);
-
-                    DiscriminatorColumn discriminatorColumn = c.getAnnotation(DiscriminatorColumn.class);
-                    if (discriminatorColumn != null)
-                        xml.append("  <discriminator-column name=\"").append(discriminatorColumn.value()).append("\"/>").append(EOLN);
-
-                    writeAttributes(xml, c, getID(c), embeddableTypes);
+                    writeAttributes(xml, c);
 
                     xml.append(" </entity>").append(EOLN);
 
@@ -223,13 +111,6 @@ class EntityDefiner implements Runnable {
                 } else {
                     entityClassNames.add(c.getName());
                 }
-            }
-
-            for (Class<?> type : embeddableTypes) {
-                StringBuilder xml = new StringBuilder(500).append(" <embeddable class=\"").append(type.getName()).append("\">").append(EOLN);
-                writeAttributes(xml, type, null, null);
-                xml.append(" </embeddable>").append(EOLN);
-                entityClassInfo.add(xml.toString());
             }
 
             Map<String, ?> properties = Collections.singletonMap("io.openliberty.persistence.internal.entityClassInfo",
@@ -383,48 +264,78 @@ class EntityDefiner implements Runnable {
         }
     }
 
-    private void writeAttributes(StringBuilder xml, Class<?> c, String keyAttributeName, List<Class<?>> embeddableTypes) {
-        xml.append("  <attributes>").append(EOLN);
+    private void writeAttributes(StringBuilder xml, Class<?> c) {
 
-        List<Field> fields = new ArrayList<Field>();
-        for (Class<?> superc = c; superc != null; superc = superc.getSuperclass()) {
-            boolean isMappedSuperclass = superc.getAnnotation(MappedSuperclass.class) != null;
-            if (isMappedSuperclass || superc == c)
-                for (Field f : superc.getFields())
-                    if (isMappedSuperclass || c.equals(f.getDeclaringClass()))
-                        fields.add(f);
+        // Identify attributes
+        SortedMap<String, Class<?>> attributes = new TreeMap<>();
+
+        // TODO cover records once compiling against Java 17
+
+        for (Field f : c.getFields())
+            attributes.putIfAbsent(f.getName(), f.getType());
+
+        try {
+            PropertyDescriptor[] propertyDescriptors = Introspector.getBeanInfo(c).getPropertyDescriptors();
+            if (propertyDescriptors != null)
+                for (PropertyDescriptor p : propertyDescriptors) {
+                    Method setter = p.getWriteMethod();
+                    if (setter != null)
+                        attributes.putIfAbsent(p.getName(), p.getPropertyType());
+                }
+        } catch (IntrospectionException x) {
+            throw new MappingException(x);
         }
 
-        for (Field field : fields) {
-            Id id = field.getAnnotation(Id.class);
-            Column column = field.getAnnotation(Column.class);
-            Generated generated = field.getAnnotation(Generated.class);
-            Embeddable embeddable = field.getType().getAnnotation(Embeddable.class);
-
-            String attributeName = field.getName();
-            String columnName = column == null || column.value().length() == 0 ? //
-                            id == null || id.value().length() == 0 ? null : id.value() : //
-                            column.value();
-            boolean isCollection = Collection.class.isAssignableFrom(field.getType());
-
-            String columnType;
-            if (embeddable == null) {
-                columnType = id != null || keyAttributeName != null && keyAttributeName.equals(attributeName) ? "id" : //
-                                "version".equals(attributeName) ? "version" : //
-                                                isCollection ? "element-collection" : //
-                                                                "basic";
-            } else if (embeddableTypes == null) {
-                throw new UnsupportedOperationException("TODO: Embeddedable within an Embeddable");
-            } else {
-                columnType = "embedded";
-                embeddableTypes.add(field.getType());
+        // Determine which attribute is the id.
+        // Precedence is:
+        // (1) has name of Id, or ID, or id.
+        // (2) name ends with Id.
+        // (3) name ends with ID.
+        // (4) name ends with id.
+        String keyAttributeName = null;
+        int precedence = 10;
+        for (String name : attributes.keySet())
+            if (name.length() > 2) {
+                if (precedence > 2) {
+                    char i = name.charAt(name.length() - 2);
+                    if (i == 'I') {
+                        char d = name.charAt(name.length() - 1);
+                        if (d == 'd') {
+                            keyAttributeName = name;
+                            precedence = 2;
+                        } else if (d == 'D' && precedence > 3) {
+                            keyAttributeName = name;
+                            precedence = 3;
+                        }
+                    } else if (i == 'i' && precedence > 4 && name.charAt(name.length() - 1) == 'd') {
+                        keyAttributeName = name;
+                        precedence = 4;
+                    }
+                }
+            } else if (name.equalsIgnoreCase("ID")) {
+                keyAttributeName = name;
+                precedence = 1;
+                break;
             }
 
+        if (keyAttributeName == null)
+            throw new MappingException("Entity class " + c.getName() + " lacks a public field of the form *ID or public method of the form get*ID."); // TODO NLS
+
+        // Write the attributes to XML:
+
+        xml.append("  <attributes>").append(EOLN);
+
+        for (Map.Entry<String, Class<?>> attributeInfo : attributes.entrySet()) {
+            String attributeName = attributeInfo.getKey();
+            Class<?> attributeType = attributeInfo.getValue();
+            boolean isCollection = Collection.class.isAssignableFrom(attributeType);
+
+            String columnType = keyAttributeName != null && keyAttributeName.equalsIgnoreCase(attributeName) ? "id" : //
+                            "version".equalsIgnoreCase(attributeName) ? "version" : //
+                                            isCollection ? "element-collection" : //
+                                                            "basic";
+
             xml.append("   <" + columnType + " name=\"" + attributeName + "\">").append(EOLN);
-            if (columnName != null)
-                xml.append("    <column name=\"" + columnName + "\"/>").append(EOLN);
-            if (generated != null)
-                xml.append("    <generated-value strategy=\"" + generated.value().name() + "\"/>").append(EOLN);
             xml.append("   </" + columnType + ">").append(EOLN);
         }
 

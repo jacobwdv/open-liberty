@@ -32,7 +32,10 @@ import componenttest.annotation.MinimumJavaLevel;
                 TelemetryAPITest.class,
                 MultiThreadedContextTest.class,
                 TelemetryMisconfigTest.class,
-                TelemetryLongRunningTest.class
+                TelemetryLongRunningTest.class,
+                TelemetryGlobalOpenTelemetryTest.class,
+                TelemetryDisabledTest.class,
 })
 
-public class FATSuite {}
+public class FATSuite {
+}
