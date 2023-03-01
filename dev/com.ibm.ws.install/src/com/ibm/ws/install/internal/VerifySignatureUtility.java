@@ -13,6 +13,7 @@ package com.ibm.ws.install.internal;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +22,8 @@ import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.Security;
 import java.time.Instant;
@@ -71,18 +74,27 @@ public class VerifySignatureUtility {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    public boolean isLibertyKeyValid() {
-        try {
-            //TODO: change to valid file path
-            File LibertyKey = new File("/some_path_to_liberty_key");
-            InputStream keyIn = new BufferedInputStream(new FileInputStream(LibertyKey));
+    public boolean isKeyValid(Path keyPath) throws InstallException {
+        File pubKey = keyPath.toFile();
+        try (FileInputStream fis = new FileInputStream(pubKey); InputStream keyIn = new BufferedInputStream(fis)) {
+
             PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
-            if (pgpPubKeyRing.getPublicKey().hasRevocation()) {
-                logger.warning(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_REVOKED_PUBLIC_KEY", String.format("%x", pgpPubKeyRing.getPublicKey().getKeyID())));
-                return false;
+            PGPPublicKey publicKey = pgpPubKeyRing.getPublicKey();
+            String keyID = String.format("%x", pgpPubKeyRing.getPublicKey().getKeyID());
+
+            //Check if the key is revoked
+            if (publicKey.hasRevocation()) {
+                throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_REVOKED_PUBLIC_KEY", keyID));
+            }
+
+            if (publicKey.getValidSeconds() > 0) { //0 mean no expiry date
+                Instant expiryDate = publicKey.getCreationTime().toInstant().plusSeconds(publicKey.getValidSeconds());
+                if (expiryDate.isBefore(Instant.now())) {
+                    throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_EXPIRED_PUBLIC_KEY", keyID, expiryDate));
+                }
             }
         } catch (IOException e) {
-            logger.fine("Liberty key is corrupted or revoked. Downloading from the keyserver..");
+            logger.fine(keyPath.toString() + " is corrupted. ");
             return false;
         }
 
@@ -110,19 +122,21 @@ public class VerifySignatureUtility {
                 conn = keyUrl.openConnection(proxy);
                 conn.setConnectTimeout(10000);
 
-                BufferedInputStream in = new BufferedInputStream(conn.getInputStream());
-                File tempFile = File.createTempFile("signature", ".asc", Utils.getInstallDir());
-                tempFile.deleteOnExit(); //Delete when JVM exits
-                FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-                byte dataBuffer[] = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
-                    fileOutputStream.write(dataBuffer, 0, bytesRead);
+                try (BufferedInputStream in = new BufferedInputStream(conn.getInputStream())) {
+                    File tempFile = File.createTempFile("signature", ".asc", Utils.getInstallDir());
+                    tempFile.deleteOnExit(); //Delete when JVM exits
+                    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+                        byte dataBuffer[] = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
+                            fileOutputStream.write(dataBuffer, 0, bytesRead);
+                        }
+                        if (isKeyValid(tempFile.toPath())) {
+                            downloadedKeys.add(tempFile);
+                        }
+                    }
                 }
 
-                downloadedKeys.add(tempFile);
-                fileOutputStream.close();
-                in.close();
             } catch (IOException e) {
                 // handle exception
                 throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_FAILED_TO_DOWNLOAD_KEY_FROM_KEY_SERVER", e.getMessage()));
@@ -136,7 +150,7 @@ public class VerifySignatureUtility {
         List<String> pubKeyUrls = new ArrayList<>();
 
         //TODO check pubkey shipped from liberty package
-        if (!isLibertyKeyValid()) {
+        if (!isKeyValid(Paths.get("/Path_to_liberty_key"))) {
             String liberty_keyID = System.getProperty("com.ibm.ws.install.libertyKeyID", DEFAULT_LIBERTY_KEY_ID);
             String PUBKEY_URL = UbuntuServerURL + liberty_keyID;
             pubKeyUrls.add(PUBKEY_URL);
@@ -244,15 +258,15 @@ public class VerifySignatureUtility {
         try {
             // Read and import all public keys to the key ring
             for (File key : pubKeys) {
-                InputStream keyIn = new BufferedInputStream(new FileInputStream(key));
-                if (pgpPubRingCollection == null) {
-                    pgpPubRingCollection = new PGPPublicKeyRingCollection(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
-                } else {
-                    PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
-                    pgpPubRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(pgpPubRingCollection,
-                                                                                       pgpPubKeyRing);
+                try (InputStream keyIn = new BufferedInputStream(new FileInputStream(key))) {
+                    if (pgpPubRingCollection == null) {
+                        pgpPubRingCollection = new PGPPublicKeyRingCollection(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
+                    } else {
+                        PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
+                        pgpPubRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(pgpPubRingCollection,
+                                                                                           pgpPubKeyRing);
+                    }
                 }
-                keyIn.close();
             }
 
             //check if the public key was found
@@ -263,18 +277,6 @@ public class VerifySignatureUtility {
                 PGPPublicKey publicKey = iterator.next().getPublicKey();
                 String keyID = String.format("%x", publicKey.getKeyID());
                 str.append(keyID + "\t");
-
-                //Check if the key is revoked
-                if (publicKey.hasRevocation()) {
-                    throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_REVOKED_PUBLIC_KEY", keyID));
-                }
-
-                if (publicKey.getValidSeconds() > 0) { //0 mean no expiry date
-                    Instant expiryDate = publicKey.getCreationTime().toInstant().plusSeconds(publicKey.getValidSeconds());
-                    if (expiryDate.isBefore(Instant.now())) {
-                        throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_EXPIRED_PUBLIC_KEY", keyID, expiryDate));
-                    }
-                }
             }
             logger.fine(str.toString());
 
@@ -287,17 +289,15 @@ public class VerifySignatureUtility {
             String esa_path = f.getAbsolutePath();
             String sig_path = esa_path + ".asc";
             try {
-                InputStream sigIn = new BufferedInputStream(new FileInputStream(sig_path));
                 logger.fine(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("STATE_VERIFYING", f.getName()));
-                if (!isValidSignature(esa_path, sigIn, pgpPubRingCollection)) {
+                if (!isValidSignature(esa_path, sig_path, pgpPubRingCollection)) {
                     failedFeatures.add(f);
                 } else {
                     logger.fine(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("LOG_VERIFIED_FEATURE", f.getName()));
                 }
-                sigIn.close();
                 progressBar.updateProgress(increment);
 
-            } catch (Exception e) {
+            } catch (IOException | PGPException | GeneralSecurityException e) {
                 failedFeatures.add(f);
             }
         }
@@ -310,29 +310,12 @@ public class VerifySignatureUtility {
      */
     private boolean isValidSignature(
                                      String fileName,
-                                     InputStream sigIn,
+                                     String sig_path,
                                      PGPPublicKeyRingCollection pgpPubRingCollection) throws GeneralSecurityException, IOException, PGPException {
 
         // Read signature file
-        sigIn = PGPUtil.getDecoderStream(sigIn);
-
-        JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(sigIn);
-        PGPSignatureList signatureList;
-
-        Object o = pgpFact.nextObject();
-        if (o instanceof PGPCompressedData) {
-            PGPCompressedData c1 = (PGPCompressedData) o;
-
-            pgpFact = new JcaPGPObjectFactory(c1.getDataStream());
-
-            signatureList = (PGPSignatureList) pgpFact.nextObject();
-        } else {
-            signatureList = (PGPSignatureList) o;
-        }
-
-        if (signatureList.isEmpty()) {
-            logger.fine("The PGP signautre could not be processed for the following : " + fileName);
-        }
+        PGPSignatureList signatureList = getSignatureList(fileName, sig_path);
+        //TODO: check sig list length.. throw exception if necessary
         PGPSignature sig = signatureList.get(0);
         logger.fine(String.format("Key ID used in signature: %x", sig.getKeyID()));
 
@@ -344,21 +327,64 @@ public class VerifySignatureUtility {
             return false;
         }
         logger.fine("Public key ID used: " + pubKey.getKeyID());
+        return verifySignature(fileName, sig, pubKey);
+    }
+
+    /**
+     * @param fileName
+     * @param sig
+     * @param pubKey
+     * @return
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    private boolean verifySignature(String fileName, PGPSignature sig, PGPPublicKey pubKey) throws IOException, FileNotFoundException, PGPException {
         sig.init(new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), pubKey);
 
         // Read file to verify
-        InputStream dIn = new BufferedInputStream(new FileInputStream(fileName));
-
-        int ch;
-        while ((ch = dIn.read()) >= 0) {
-            sig.update((byte) ch);
+        try (InputStream dIn = new BufferedInputStream(new FileInputStream(fileName))) {
+            int ch;
+            while ((ch = dIn.read()) >= 0) {
+                sig.update((byte) ch);
+            }
         }
-        dIn.close();
 
-        if (sig.verify()) {
-            return true;
-        } else {
-            return false;
-        }
+        return sig.verify();
     }
+
+    /**
+     * @param fileName
+     * @param sig_path
+     * @param signatureList
+     * @return
+     * @throws IOException
+     * @throws FileNotFoundException
+     */
+    private PGPSignatureList getSignatureList(String fileName, String sig_path) throws IOException, FileNotFoundException, PGPException {
+        PGPSignatureList signatureList = null;
+        try (InputStream sigIn = new BufferedInputStream(new FileInputStream(sig_path));
+                        InputStream decoderStream = PGPUtil.getDecoderStream(sigIn)) {
+
+            JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(decoderStream);
+
+            Object o;
+            while ((o = pgpFact.nextObject()) != null) {
+                if (o instanceof PGPCompressedData) {
+                    PGPCompressedData c1 = (PGPCompressedData) o;
+
+                    pgpFact = new JcaPGPObjectFactory(c1.getDataStream());
+
+                    signatureList = (PGPSignatureList) pgpFact.nextObject();
+                } else {
+                    signatureList = (PGPSignatureList) o;
+                }
+
+                if (signatureList.isEmpty()) {
+                    logger.fine("The PGP signature could not be processed for the following : " + fileName);
+                }
+            }
+        }
+        return signatureList;
+    }
+
 }

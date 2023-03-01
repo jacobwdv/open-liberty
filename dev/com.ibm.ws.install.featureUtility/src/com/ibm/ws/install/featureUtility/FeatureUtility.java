@@ -75,7 +75,7 @@ public class FeatureUtility {
     private static final String WEBSPHERE_LIBERTY_GROUP_ID = "com.ibm.websphere.appserver.features";
     private static final String BETA_EDITION = "EARLY_ACCESS";
     private static final String CONNECTION_FAILED_ERROR = "CWWKF1390E";
-    private static final VerifyOption DEFUALT_VERIFY = VerifyOption.enforce;
+    private static final VerifyOption DEFAULT_VERIFY = VerifyOption.enforce;
     private static String to;
 
     private boolean isInstallServerFeature = false;
@@ -113,14 +113,6 @@ public class FeatureUtility {
         this.noCache = builder.noCache;
         this.licenseAccepted = builder.licenseAccepted;
         this.featureToExt = new HashMap<String, String>();
-	if (builder.verifyOption != null && !builder.verifyOption.isEmpty()) {
-	    try {
-		this.verifyOption = VerifyOption.valueOf(builder.verifyOption.toLowerCase());
-	    } catch (Exception e) {
-		throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES
-			.getLogMessage("ERROR_VERIFY_OPTION_NOT_VALID", builder.verifyOption));
-	    }
-	}
 
         map = new InstallKernelMap();
         info(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("STATE_INITIALIZING"));
@@ -145,26 +137,7 @@ public class FeatureUtility {
         }
 	map.put(InstallConstants.JSON_PROVIDED, false);
         overrideEnvMapWithProperties();
-	// check verify value after overriding
-	envMap = (Map<String, Object>) map.get(InstallConstants.ENVIRONMENT_VARIABLE_MAP);
-	if (envMap.get("FEATURE_VERIFY") != null) {
-	    try {
-		VerifyOption env = VerifyOption.valueOf(((String) envMap.get("FEATURE_VERIFY")).toLowerCase());
-		// If the verifyOption is set in both command line and (env var or props) than
-		// the values have to match.
-		if (verifyOption != null && verifyOption != env) {
-		    throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage(
-			    "ERROR_VERIFY_OPTION_DOES_NOT_MATCH", envMap.get("FEATURE_VERIFY"),
-			    verifyOption.toString()));
-		}
-		verifyOption = env;
-	    } catch (IllegalArgumentException e) {
-		throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES
-			.getLogMessage("ERROR_VERIFY_OPTION_NOT_VALID", (String) envMap.get("FEATURE_VERIFY")));
-	    }
-	} else if (verifyOption == null) {
-	    this.verifyOption = DEFUALT_VERIFY;
-	}
+	checkVerifyOption(builder.verifyOption);
         
 	fine("additional jsons: " + additionalJsons);
         if (additionalJsons != null && !additionalJsons.isEmpty()) {
@@ -202,6 +175,36 @@ public class FeatureUtility {
 	}
 
 	progressBar.manuallyUpdate();
+    }
+
+    /**
+     * @param builder
+     * @throws InstallException
+     */
+    private void checkVerifyOption(String builderVerifyOption) throws InstallException {
+	Map<String, Object> envMap = (Map<String, Object>) map.get(InstallConstants.ENVIRONMENT_VARIABLE_MAP);
+	String verifyValue = null;
+	if (builderVerifyOption == null) {
+	    verifyValue = DEFAULT_VERIFY.toString();
+	}
+	// check verify value after overriding
+	if (envMap.get("FEATURE_VERIFY") != null) {
+	    // If the verifyOption is set in both command line and (env var or props) than
+	    // the values have to match.
+	    if (!((String) envMap.get("FEATURE_VERIFY")).equalsIgnoreCase(builderVerifyOption)) {
+		throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage(
+			"ERROR_VERIFY_OPTION_DOES_NOT_MATCH", envMap.get("FEATURE_VERIFY"),
+			builderVerifyOption));
+		}
+		verifyValue = ((String) envMap.get("FEATURE_VERIFY")).toLowerCase();
+	}
+
+	try {
+	    this.verifyOption = VerifyOption.valueOf(verifyValue);
+	} catch (IllegalArgumentException e) {
+	    throw new InstallException(
+		    Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_VERIFY_OPTION_NOT_VALID", verifyValue));
+	}
     }
     
     public void setFeatureToExt(Map<String, String> featureToExt) {
