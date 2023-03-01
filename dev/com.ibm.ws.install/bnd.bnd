@@ -36,11 +36,11 @@ instrument.disabled: true
 -buildpath: \
 	com.ibm.ws.crypto.passwordutil;version=latest,\
 	com.ibm.ws.install.map;version=latest,\
-	org.fusesource.jansi:jansi;strategy=exact;version=1.18.0,\
+	org.fusesource.jansi:jansi;strategy=exact;version='1.18.0',\
 	com.ibm.ws.kernel.boot.core;version=latest,\
 	com.ibm.ws.kernel.feature;version=latest,\
 	com.ibm.ws.product.utility;version=latest,\
-	javax.json-api;strategy=exact;version=1.1.4,\
+	javax.json-api;strategy=exact;version='1.1.4',\
 	com.ibm.ws.repository;version=latest,\
 	com.ibm.ws.repository.liberty;version=latest,\
 	com.ibm.ws.repository.resolver;version=latest,\
@@ -52,9 +52,11 @@ instrument.disabled: true
 	com.ibm.ws.org.osgi.annotation.versioning;version=latest,\
 	com.ibm.ws.kernel.feature.cmdline;version=latest,\
 	com.ibm.ws.kernel.feature.core;version=latest,\
-	org.bouncycastle:bcpg-jdk15on;version=1.69,\
-	org.bouncycastle:bcprov-jdk15on;version=1.69,\
-	org.glassfish.javax.json
+	org.bouncycastle:bcpg-jdk15on;version='1.69',\
+	org.bouncycastle:bcprov-jdk15on;version='1.69',\
+	org.glassfish.javax.json,\
+	bcprov,\
+	bcpg
 
 
 -testpath: \

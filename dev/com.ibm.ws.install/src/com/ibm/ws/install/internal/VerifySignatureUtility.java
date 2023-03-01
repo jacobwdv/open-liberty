@@ -22,8 +22,6 @@ import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.Security;
 import java.time.Instant;
@@ -74,30 +72,38 @@ public class VerifySignatureUtility {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    public boolean isKeyValid(Path keyPath) throws InstallException {
-        File pubKey = keyPath.toFile();
-        try (FileInputStream fis = new FileInputStream(pubKey); InputStream keyIn = new BufferedInputStream(fis)) {
+    public boolean isKeyValid(File pubKey) {
+        boolean isValid = false;
 
+        try (FileInputStream fis = new FileInputStream(pubKey); InputStream keyIn = new BufferedInputStream(fis)) {
             PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
             PGPPublicKey publicKey = pgpPubKeyRing.getPublicKey();
-            String keyID = String.format("%x", pgpPubKeyRing.getPublicKey().getKeyID());
+            isValid = validatePublicKey(publicKey);
+        } catch (IOException | InstallException e) {
+            logger.log(Level.WARNING, "", e);
+        }
+        return isValid;
+    }
 
-            //Check if the key is revoked
-            if (publicKey.hasRevocation()) {
-                throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_REVOKED_PUBLIC_KEY", keyID));
-            }
+    /**
+     * @param publicKey
+     * @param keyID
+     * @throws InstallException
+     */
+    protected boolean validatePublicKey(PGPPublicKey publicKey) throws InstallException {
+        String keyID = String.format("%x", publicKey.getKeyID());
 
-            if (publicKey.getValidSeconds() > 0) { //0 mean no expiry date
-                Instant expiryDate = publicKey.getCreationTime().toInstant().plusSeconds(publicKey.getValidSeconds());
-                if (expiryDate.isBefore(Instant.now())) {
-                    throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_EXPIRED_PUBLIC_KEY", keyID, expiryDate));
-                }
-            }
-        } catch (IOException e) {
-            logger.fine(keyPath.toString() + " is corrupted. ");
-            return false;
+        //Check if the key is revoked
+        if (publicKey.hasRevocation()) {
+            throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_REVOKED_PUBLIC_KEY", keyID));
         }
 
+        if (publicKey.getValidSeconds() > 0) { //0 mean no expiry date
+            Instant expiryDate = publicKey.getCreationTime().toInstant().plusSeconds(publicKey.getValidSeconds());
+            if (expiryDate.isBefore(Instant.now())) {
+                throw new InstallException(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("ERROR_EXPIRED_PUBLIC_KEY", keyID, expiryDate));
+            }
+        }
         return true;
     }
 
@@ -131,7 +137,7 @@ public class VerifySignatureUtility {
                         while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
                             fileOutputStream.write(dataBuffer, 0, bytesRead);
                         }
-                        if (isKeyValid(tempFile.toPath())) {
+                        if (isKeyValid(tempFile)) {
                             downloadedKeys.add(tempFile);
                         }
                     }
@@ -150,10 +156,12 @@ public class VerifySignatureUtility {
         List<String> pubKeyUrls = new ArrayList<>();
 
         //TODO check pubkey shipped from liberty package
-        if (!isKeyValid(Paths.get("/Path_to_liberty_key"))) {
+        //TODO if liberty key is invalid we need to log
+        if (!isKeyValid(new File("/Path_to_liberty_key"))) {
             String liberty_keyID = System.getProperty("com.ibm.ws.install.libertyKeyID", DEFAULT_LIBERTY_KEY_ID);
             String PUBKEY_URL = UbuntuServerURL + liberty_keyID;
             pubKeyUrls.add(PUBKEY_URL);
+            // TODO download the new key
         }
 
         //get users public keys
@@ -253,36 +261,19 @@ public class VerifySignatureUtility {
     public void verifySignatures(Collection<File> artifacts, List<File> pubKeys, List<File> failedFeatures) throws InstallException {
 
         logger.info(Messages.INSTALL_KERNEL_MESSAGES.getLogMessage("STATE_STARTING_VERIFY"));
-        PGPPublicKeyRingCollection pgpPubRingCollection = null;
+        PGPPublicKeyRingCollection pgpPubRingCollection = getRingCollection(pubKeys);
 
-        try {
-            // Read and import all public keys to the key ring
-            for (File key : pubKeys) {
-                try (InputStream keyIn = new BufferedInputStream(new FileInputStream(key))) {
-                    if (pgpPubRingCollection == null) {
-                        pgpPubRingCollection = new PGPPublicKeyRingCollection(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
-                    } else {
-                        PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
-                        pgpPubRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(pgpPubRingCollection,
-                                                                                           pgpPubKeyRing);
-                    }
-                }
-            }
+        //check if the public key was found
+        Iterator<PGPPublicKeyRing> iterator = pgpPubRingCollection.getKeyRings();
 
-            //check if the public key was found
-            Iterator<PGPPublicKeyRing> iterator = pgpPubRingCollection.getKeyRings();
-            StringBuilder str = new StringBuilder();
-            str.append("Available public keyIDs: ");
-            while (iterator.hasNext()) {
-                PGPPublicKey publicKey = iterator.next().getPublicKey();
-                String keyID = String.format("%x", publicKey.getKeyID());
-                str.append(keyID + "\t");
-            }
-            logger.fine(str.toString());
-
-        } catch (IOException | PGPException e) {
-            throw new InstallException(e.getMessage());
+        StringBuilder str = new StringBuilder();
+        str.append("Available public keyIDs: ");
+        while (iterator.hasNext()) {
+            PGPPublicKey publicKey = iterator.next().getPublicKey();
+            String keyID = String.format("%x", publicKey.getKeyID());
+            str.append(keyID + "\t");
         }
+        logger.fine(str.toString());
 
         double increment = progressBar.getMethodIncrement("verifyFeatures") / (artifacts.size());
         for (File f : artifacts) {
@@ -303,6 +294,30 @@ public class VerifySignatureUtility {
         }
         progressBar.manuallyUpdate();
 
+    }
+
+    /**
+     * @param pubKeys
+     * @param pgpPubRingCollection
+     * @return
+     * @throws InstallException
+     */
+    private PGPPublicKeyRingCollection getRingCollection(List<File> pubKeys) throws InstallException {
+        try {
+            PGPPublicKeyRingCollection pgpPubRingCollection = new PGPPublicKeyRingCollection(new ArrayList<PGPPublicKeyRing>());
+            // Read and import all public keys to the key ring
+            for (File key : pubKeys) {
+                try (InputStream keyIn = new BufferedInputStream(new FileInputStream(key))) {
+                    PGPPublicKeyRing pgpPubKeyRing = new PGPPublicKeyRing(PGPUtil.getDecoderStream(keyIn), new JcaKeyFingerprintCalculator());
+                    pgpPubRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(pgpPubRingCollection,
+                                                                                       pgpPubKeyRing);
+                }
+            }
+            return pgpPubRingCollection;
+
+        } catch (IOException | PGPException e) {
+            throw new InstallException(e.getMessage());
+        }
     }
 
     /*
