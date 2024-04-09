@@ -111,6 +111,14 @@ public class ArtifactDownloaderUtils {
         return !(exists(url, envMap, repository) == HttpURLConnection.HTTP_OK);
     }
 
+    /**
+     * @param responseCode
+     * @return
+     */
+    public static boolean isHTTPResponseCodeSuccessful(int responseCode) {
+        return responseCode >= 200 && responseCode < 400;
+    }
+
     public static int exists(String URLName, Map<String, Object> envMap, MavenRepository repository) throws IOException {
         try {
             URL url = new URL(URLName);
@@ -139,7 +147,13 @@ public class ArtifactDownloaderUtils {
             conn.setConnectTimeout(10000);
             conn.setInstanceFollowRedirects(true);
             conn.connect();
-            return conn.getResponseCode();
+            int responseCode = conn.getResponseCode();
+            if (!isHTTPResponseCodeSuccessful(responseCode)) {
+                String responseBody = getResponseBody(conn);
+                logger.fine("HTTP Response code: " + responseCode);
+                logger.fine("HTTP Response body: " + responseBody);
+            }
+            return responseCode;
 
         } catch (ConnectException e) {
             throw e;
@@ -148,6 +162,39 @@ public class ArtifactDownloaderUtils {
         } catch (IOException e) {
             throw e;
         }
+    }
+
+    /**
+     * Determine if the InputStream or ErrorStream should be collected then read from the connection into a String which contains the
+     * whole response from the connection.
+     */
+    private static String getResponseBody(HttpURLConnection conn) throws IOException {
+        StringBuilder output = new StringBuilder();
+        try (InputStream is = conn.getInputStream(); InputStream es = conn.getErrorStream()) {
+            output.append(readFromInputStream(is));
+            output.append(readFromInputStream(es));
+        }
+        return output.toString();
+    }
+
+    /**
+     * @param output
+     * @param inputStream
+     * @throws UnsupportedEncodingException
+     * @throws IOException
+     */
+    private static String readFromInputStream(InputStream inputStream) throws UnsupportedEncodingException, IOException {
+        StringBuilder output = new StringBuilder();
+        if (inputStream != null) {
+            InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
+            BufferedReader reader = new BufferedReader(inputStreamReader);
+            String line = reader.readLine();
+            while (line != null) {
+                output.append(line);
+                line = reader.readLine();
+            }
+        }
+        return output.toString();
     }
 
     public static void acquireFeatureURLs(List<String> mavenCoords, String repo, Map<String, String> urltoMavenCoord, VerifyOption verifyOption, boolean downloadSignaturesOnly) {
