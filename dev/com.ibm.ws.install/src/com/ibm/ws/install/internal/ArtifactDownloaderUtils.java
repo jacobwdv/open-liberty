@@ -170,10 +170,13 @@ public class ArtifactDownloaderUtils {
      */
     private static String getResponseBody(HttpURLConnection conn) throws IOException {
         StringBuilder output = new StringBuilder();
-        try (InputStream is = conn.getInputStream(); InputStream es = conn.getErrorStream()) {
-            output.append(readFromInputStream(is));
-            output.append(readFromInputStream(es));
+        InputStream is;
+        if (100 <= conn.getResponseCode() && conn.getResponseCode() <= 399) {
+            is = conn.getInputStream();
+        } else {
+            is = conn.getErrorStream();
         }
+        output.append(readFromInputStream(is));
         return output.toString();
     }
 
