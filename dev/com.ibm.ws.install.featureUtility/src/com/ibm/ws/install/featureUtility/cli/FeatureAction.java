@@ -84,16 +84,20 @@ public enum FeatureAction implements ActionDefinition {
             // Set log level if --verbose specified
             InstallKernel installKernel = InstallKernelFactory.getInstance();
             String verboseLevel = args.getOption("verbose");
-            
-            Level logLevel = Level.INFO;
-            if (verboseLevel != null && verboseLevel.isEmpty()) {
-                logLevel = Level.FINEST;
-            } else if (verboseLevel != null && !verboseLevel.isEmpty()) {
-            	System.out.println(NLS.getMessage("unknown.options", args.getAction(), "--verbose=" + verboseLevel));
-                FeatureAction.help.handleTask(new ArgumentsImpl(new String[] { "help", FeatureAction.getEnum(args.getAction()).toString() }));
-                return ReturnCode.BAD_ARGUMENT;
-            }
-          
+
+			Level logLevel = Level.INFO;
+			if (verboseLevel != null && verboseLevel.isEmpty()) {
+				logLevel = Level.FINEST;
+			} else if (verboseLevel != null && verboseLevel.toLowerCase().equals("debug")) {
+				// Undocumented debug log level, used for Problem determination
+				logLevel = InstallLogLevel.FEATUREUTILITY_DEBUG;
+			} else if (verboseLevel != null && !verboseLevel.isEmpty()) {
+				System.out.println(NLS.getMessage("unknown.options", args.getAction(), "--verbose=" + verboseLevel));
+				FeatureAction.help.handleTask(
+						new ArgumentsImpl(new String[] { "help", FeatureAction.getEnum(args.getAction()).toString() }));
+				return ReturnCode.BAD_ARGUMENT;
+			}
+
             ((InstallKernelImpl) installKernel).enableConsoleLog(logLevel);
             return action.handleTask(System.out, System.err, args);
         } catch (FeatureToolException fte) {

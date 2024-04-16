@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -388,7 +388,7 @@ public class InstallKernelImpl implements InstallKernel, InstallKernelInteractiv
 
     @Override
     public void enableConsoleLog(Level level) {
-        boolean verbose = (Level.FINEST.equals(level));
+        boolean verbose = (level.intValue() <= Level.FINEST.intValue());
         this.director.enableConsoleLog(level, verbose);
     }
 
