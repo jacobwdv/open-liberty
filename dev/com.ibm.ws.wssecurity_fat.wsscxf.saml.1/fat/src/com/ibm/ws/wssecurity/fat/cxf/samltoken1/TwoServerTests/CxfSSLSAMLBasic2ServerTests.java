@@ -79,8 +79,8 @@ public class CxfSSLSAMLBasic2ServerTests extends CxfSSLSAMLBasicTests {
         copyMetaData = true;
         testSAMLServer = commonSetUp("com.ibm.ws.wssecurity_fat.saml", "server_1.xml", SAMLConstants.SAML_ONLY_SETUP, SAMLConstants.SAML_SERVER_TYPE, extraApps, extraMsgs);
 
-        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING);
-        testSAMLServer2.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES);
+        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKS5900W_ALGORITHM_INSECURE);
+        testSAMLServer2.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES, SAMLMessageConstants.CWWKS5900W_ALGORITHM_INSECURE);
         
         // now, we need to update the IDP files
         shibbolethHelpers.fixSPInfoInShibbolethServer(testSAMLServer, testIDPServer);

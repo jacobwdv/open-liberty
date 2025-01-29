@@ -83,7 +83,7 @@ public class CxfSAMLAsymSignEnc1ServerTests extends CxfSAMLAsymSignEncTests {
 
         startSPWithIDPServer("com.ibm.ws.wssecurity_fat.saml", "server_2_in_1_AsymSignEnc.xml", SAMLConstants.SAML_SERVER_TYPE, extraMsgs, extraApps, true, SAMLConstants.EXAMPLE_CALLBACK, SAMLConstants.EXAMPLE_CALLBACK_FEATURE);
         
-        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING);
+        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKS5900W_ALGORITHM_INSECURE);
 
         servicePort = Integer.toString(testSAMLServer.getServerHttpPort());
         serviceSecurePort = Integer.toString(testSAMLServer.getServerHttpsPort());

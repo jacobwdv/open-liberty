@@ -90,4 +90,6 @@ public class SAMLMessageConstants extends MessageConstants {
     public static final String SRVE0190E_FILE_NOT_FOUND = "SRVE0190E";
 
     public static final String CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES = "CWWKG0101W";
+
+    public static final String CWWKS5900W_ALGORITHM_INSECURE = "CWWKS5900W";
 }

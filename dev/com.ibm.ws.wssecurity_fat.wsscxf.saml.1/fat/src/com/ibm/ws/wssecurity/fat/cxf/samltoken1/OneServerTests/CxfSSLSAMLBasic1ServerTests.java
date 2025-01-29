@@ -78,7 +78,7 @@ public class CxfSSLSAMLBasic1ServerTests extends CxfSSLSAMLBasicTests {
 
         startSPWithIDPServer("com.ibm.ws.wssecurity_fat.saml", "server_2_in_1.xml", SAMLConstants.SAML_SERVER_TYPE, extraMsgs, extraApps, true);
         //The test does not use Callbackhandler
-        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES);
+        testSAMLServer.addIgnoredServerExceptions(SAMLMessageConstants.CWWKS5207W_SAML_CONFIG_IGNORE_ATTRIBUTES, SAMLMessageConstants.CWWKF0001E_FEATURE_MISSING, SAMLMessageConstants.CWWKG0101W_CONFIG_NOT_VISIBLE_TO_OTHER_BUNDLES, SAMLMessageConstants.CWWKS5900W_ALGORITHM_INSECURE);
 
         servicePort = Integer.toString(testSAMLServer.getServerHttpPort());
         serviceSecurePort = Integer.toString(testSAMLServer.getServerHttpsPort());
