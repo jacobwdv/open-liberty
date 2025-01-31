@@ -8038,9 +8038,9 @@ public class LibertyServer implements LogMonitorClient {
         return envVars.get(var);
     }
 
-    public void configureLTPAKeys(JavaInfo info) throws IOException, InterruptedException {
+    private void configureLTPAKeys(JavaInfo info) throws IOException, InterruptedException {
 
-        if (isFIPS140_3EnabledAndSupported()) {
+        if (isFIPS140_3EnabledAndSupported(info)) {
             String serverSecurityDir = serverRoot + File.separator + "resources" + File.separator + "security";
             File ltpaFIPSKeys = new File(serverSecurityDir, "ltpaFIPS.keys");
             File ltpaKeys = new File(serverSecurityDir, "ltpa.keys");
@@ -8071,7 +8071,8 @@ public class LibertyServer implements LogMonitorClient {
         }
     }
 
-    private void configureLTPAKeys() throws IOException, InterruptedException {
+    
+    public void configureLTPAKeys() throws IOException, InterruptedException {
         configureLTPAKeys(JavaInfo.forServer(this));
     }
 
