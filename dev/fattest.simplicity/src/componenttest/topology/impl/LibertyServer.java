@@ -1729,16 +1729,11 @@ public class LibertyServer implements LogMonitorClient {
         //FIPS 140-3
         // if we have FIPS 140-3 enabled, and the matched java/platform, add JVM Arg
         if (isFIPS140_3EnabledAndSupported(info)) {
-            Map<String, String> fipsOpts = getFipsJvmOptions(info, false);
-            StringJoiner joiner = new StringJoiner(" ", " ", "");
-            for (String key : fipsOpts.keySet()) {
-                if (fipsOpts.get(key) != null) {
-                    joiner.add(String.format("%s=%s", key, fipsOpts.get(key)));
-                } else {
-                    joiner.add(key);
-                }
-            }
-            JVM_ARGS += joiner.toString();
+            // TODO: `getJvmOptionsAsMap()` should be added to JVM_ARGS outside of this if-block so that we always run it.
+            // During FIPS 140-3 development, we found test scenarios where jvm.options is set before server start and the file is ignored.
+            // So that we can test FIPS 140-3 without causing issues unrelated to FIPS, we have put it inside this if-block, for now.
+            JVM_ARGS += getJvmArgString(this.getJvmOptionsAsMap());
+            JVM_ARGS += getJvmArgString(this.getFipsJvmOptions(info, false));
         }
 
         Properties bootstrapProperties = getBootstrapProperties();
@@ -1988,6 +1983,22 @@ public class LibertyServer implements LogMonitorClient {
 
         Log.exiting(c, method);
         return output;
+    }
+
+    /**
+     * @param  fipsOpts, a Map containing jvm argument name/value pairs
+     * @return           A string that starts with a space and contains key/value pairs represented by 'key=value' and separated by spaces
+     */
+    private String getJvmArgString(Map<String, String> fipsOpts) {
+        StringJoiner joiner = new StringJoiner(" ", " ", "");
+        for (String key : fipsOpts.keySet()) {
+            if (fipsOpts.get(key) != null) {
+                joiner.add(String.format("%s=%s", key, fipsOpts.get(key)));
+            } else {
+                joiner.add(key);
+            }
+        }
+        return joiner.toString();
     }
 
     private String[] checkpointAdjustParams(List<String> parametersList) {
@@ -8071,8 +8082,12 @@ public class LibertyServer implements LogMonitorClient {
         }
     }
 
+<<<<<<< HEAD
     
     public void configureLTPAKeys() throws IOException, InterruptedException {
+=======
+    private void configureLTPAKeys() throws IOException, InterruptedException {
+>>>>>>> dcc73a0100b4ad0fb507699e85f24416ac8d3d8f
         configureLTPAKeys(JavaInfo.forServer(this));
     }
 
