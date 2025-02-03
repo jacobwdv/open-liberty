@@ -8081,13 +8081,8 @@ public class LibertyServer implements LogMonitorClient {
             }
         }
     }
-
-<<<<<<< HEAD
     
     public void configureLTPAKeys() throws IOException, InterruptedException {
-=======
-    private void configureLTPAKeys() throws IOException, InterruptedException {
->>>>>>> dcc73a0100b4ad0fb507699e85f24416ac8d3d8f
         configureLTPAKeys(JavaInfo.forServer(this));
     }
 
