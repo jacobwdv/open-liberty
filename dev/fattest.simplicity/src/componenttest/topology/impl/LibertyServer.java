@@ -1993,6 +1993,7 @@ public class LibertyServer implements LogMonitorClient {
         StringJoiner joiner = new StringJoiner(" ", " ", "");
         for (String key : fipsOpts.keySet()) {
             if (fipsOpts.get(key) != null) {
+                Log.info(c, "getJvmArgString", "fipsOptsValue='" + fipsOpts.get(key) + "'");
                 joiner.add(String.format("%s=%s", key, fipsOpts.get(key)));
             } else {
                 joiner.add(key);
@@ -8081,7 +8082,7 @@ public class LibertyServer implements LogMonitorClient {
             }
         }
     }
-    
+
     public void configureLTPAKeys() throws IOException, InterruptedException {
         configureLTPAKeys(JavaInfo.forServer(this));
     }
