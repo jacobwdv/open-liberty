@@ -1996,7 +1996,7 @@ public class LibertyServer implements LogMonitorClient {
         for (String key : fipsOpts.keySet()) {
             String value = fipsOpts.get(key);
             if (value != null && !value.isEmpty()) {
-                joiner.add(String.format("%s=%s", key, escapeCharacters(value)));
+                joiner.add(String.format("%s=%s", escapeCharacters(key), escapeCharacters(value)));
             } else {
                 joiner.add(key);
             }
