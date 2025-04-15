@@ -34,6 +34,12 @@ import com.ibm.wsspi.security.crypto.EncryptedInfo;
 public class PasswordUtil {
     /**
      * <p>
+     * Constant that holds a true or false value to inform the utility that the crypto.key is a base64 AES key (and not a passphrase)
+     * </p>
+     **/
+    public final static String PROPERTY_CRYPTO_AES_KEY = "crypto.aes.key";
+    /**
+     * <p>
      * Constant that holds the name of the property for specifying the encryption algorithm for the encode and encode_password method.
      * </p>
      **/

@@ -12,11 +12,13 @@
  *******************************************************************************/
 package com.ibm.ws.crypto.util;
 
+import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.crypto.SecretKeyFactory;
@@ -121,6 +123,15 @@ public class AESKeyManager {
     private static KeyHolder getHolder(KeyVersion version, String key) throws NoSuchAlgorithmException, InvalidKeySpecException {
         char[] keyChars = _resolver.get().getKey(key == null ? "${wlp.password.encryption.key}" : key);
         return version.get(keyChars);
+    }
+
+    public static byte[] getAesKey() throws InvalidKeyException {
+        char[] base64Key = _resolver.get().getKey("${wlp.aes.encryption.key}");
+        byte[] key = Base64.getDecoder().decode(new String(base64Key));
+        if (key.length != 32) {
+            throw new InvalidKeyException("Error: The provided key is not 256 bits (32 bytes).");
+        }
+        return key;
     }
 
     /**

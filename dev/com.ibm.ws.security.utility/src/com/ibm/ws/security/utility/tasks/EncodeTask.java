@@ -48,8 +48,9 @@ public class EncodeTask extends BaseCommandTask {
     private static final String ARG_KEYRING = "--keyring";
     private static final String ARG_KEYRING_TYPE = "--keyringType";
     private static final String ARG_KEY_LABEL = "--keyLabel";
+    private static final String ARG_AES_LABEL = "--aesKey";
     private static final List<String> ARG_TABLE = Arrays.asList(ARG_ENCODING, ARG_KEY, ARG_LIST_CUSTOM, ARG_PASSWORD, ARG_HASH_SALT, ARG_HASH_ITERATION, ARG_HASH_ALGORITHM,
-                                                                ARG_HASH_ENCODED, ARG_KEYRING, ARG_KEYRING_TYPE, ARG_KEY_LABEL);
+                                                                ARG_HASH_ENCODED, ARG_KEYRING, ARG_KEYRING_TYPE, ARG_KEY_LABEL, ARG_AES_LABEL);
 
     public EncodeTask(String scriptName) {
         super(scriptName);
@@ -336,6 +337,10 @@ public class EncodeTask extends BaseCommandTask {
         value = argMap.get(ARG_KEY_LABEL);
         if (value != null) {
             props.put(PasswordUtil.PROPERTY_KEY_LABEL, value);
+        }
+        value = argMap.get(ARG_AES_LABEL);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_CRYPTO_AES_KEY, value);
         }
 
         return props;
