@@ -678,7 +678,8 @@ public class PasswordCipherUtil {
         System.arraycopy(decrypted_bytes, 0, preEncrypted, seedSize + 1, decrypted_bytes.length);
         try {
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            GCMParameterSpec ps = new GCMParameterSpec(128, rand.generateSeed(c.getBlockSize()));
+            // 128 is the GCM tag length. 128 is the MAX.
+            GCMParameterSpec ps = new GCMParameterSpec(128, getIvSourceBuffer(rand, c));
             c.init(Cipher.ENCRYPT_MODE, AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V1, cryptoKey), ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
             if (encrypted_bytes != null) {
@@ -705,6 +706,17 @@ public class PasswordCipherUtil {
             throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
         }
         return info;
+    }
+
+    /**
+     * @param rand
+     * @param c
+     * @return
+     */
+    private static byte[] getIvSourceBuffer(SecureRandom rand, Cipher c) {
+        byte[] ivSource = new byte[c.getBlockSize()];
+        rand.nextBytes(ivSource);
+        return ivSource;
     }
 
     /**
@@ -741,8 +753,8 @@ public class PasswordCipherUtil {
         System.arraycopy(decrypted_bytes, 0, preEncrypted, seedSize + 1, decrypted_bytes.length);
         try {
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            GCMParameterSpec ps = new GCMParameterSpec(128, rand.generateSeed(c.getBlockSize()));
-
+            // 128 is the GCM tag length. 128 is the MAX.
+            GCMParameterSpec ps = new GCMParameterSpec(128, getIvSourceBuffer(rand, c));
             SecretKeySpec secretKeySpec = new SecretKeySpec(key, "AES");
             c.init(Cipher.ENCRYPT_MODE, secretKeySpec, ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
