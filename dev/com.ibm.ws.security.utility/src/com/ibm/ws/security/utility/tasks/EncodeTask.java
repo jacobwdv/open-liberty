@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -106,6 +106,16 @@ public class EncodeTask extends BaseCommandTask {
      */
     private String encode(PrintStream stderr, String plaintext, String encodingType,
                           Map<String, String> properties) throws InvalidPasswordEncodingException, UnsupportedCryptoAlgorithmException {
+        if ("aes".equals(encodingType) && !properties.containsKey(PasswordUtil.PROPERTY_CRYPTO_KEY)) {
+            String aes256Key = PasswordUtil.buildAes256Key();
+            String variableName = "wlp.password.encryption.key";
+            if ("true".equalsIgnoreCase(properties.get(PasswordUtil.PROPERTY_CRYPTO_AES_KEY))) {
+                variableName = "wlp.aes.encryption.key";
+            }
+            properties.put(PasswordUtil.PROPERTY_CRYPTO_KEY, aes256Key);
+            stderr.println(getMessage("encode.aesKeyGenerated", variableName, aes256Key));
+        }
+
         String ret = null;
         try {
             ret = PasswordUtil.encode(plaintext, encodingType == null ? PasswordUtil.getDefaultEncoding() : encodingType, properties);

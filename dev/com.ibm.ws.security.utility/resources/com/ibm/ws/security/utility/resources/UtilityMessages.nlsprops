@@ -40,7 +40,7 @@ encode.enterText=Enter text:
 encode.reenterText=Re-enter text:
 encode.readError=Error reading in text.
 encode.entriesDidNotMatch=Entries did not match.
-
+encode.aesKeyGenerated=No --key was specified, so a randomly generated one was used. To use it in your Liberty server config paste the following:\n<variable name="{0}" value="{1}"/>\n\nTo encrypt more passwords with the same key, run the following:\nsecurityUtility encode --encoding=aes --key="{1}" <password>
 
 password.enterText=Enter password:
 password.reenterText=Re-enter password:

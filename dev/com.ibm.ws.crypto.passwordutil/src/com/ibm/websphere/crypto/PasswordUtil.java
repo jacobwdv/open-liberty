@@ -15,11 +15,15 @@ package com.ibm.websphere.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.crypto.KeyGenerator;
 
 import com.ibm.ws.common.encoder.Base64Coder;
 import com.ibm.ws.crypto.util.InvalidPasswordCipherException;
@@ -766,5 +770,23 @@ public class PasswordUtil {
         }
 
         return buffer.toString();
+    }
+
+    public static String buildAes256Key() {
+        KeyGenerator keyGenerator;
+        byte[] keyBytes;
+        try {
+            keyGenerator = KeyGenerator.getInstance("AES");
+            SecureRandom secureRandom = new SecureRandom();
+            keyGenerator.init(256, secureRandom);
+            javax.crypto.SecretKey secretKey = keyGenerator.generateKey();
+            keyBytes = secretKey.getEncoded();
+
+        } catch (NoSuchAlgorithmException e) {
+            SecureRandom secureRandom = new SecureRandom();
+            keyBytes = new byte[32];
+            secureRandom.nextBytes(keyBytes);
+        }
+        return Base64.getEncoder().encodeToString(keyBytes);
     }
 }
