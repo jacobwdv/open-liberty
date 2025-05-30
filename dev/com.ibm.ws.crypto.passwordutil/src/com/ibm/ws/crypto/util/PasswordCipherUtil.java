@@ -462,7 +462,7 @@ public class PasswordCipherUtil {
 
             if (!saltSet) {
                 saltString = properties.get(PasswordUtil.PROPERTY_HASH_SALT);
-                if (CryptoUtils.isFips140_3Enabled() && saltString.length() < PasswordHashGenerator.SALT_LENGTH) {
+                if (CryptoUtils.isFips140_3Enabled() && saltString != null && saltString.length() < PasswordHashGenerator.SALT_LENGTH && !saltString.isEmpty()) {
                     while (saltString.length() < PasswordHashGenerator.SALT_LENGTH) {
                         saltString += saltString;
                     }
