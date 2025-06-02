@@ -629,7 +629,7 @@ public class Oauth2LoginConfigImplTest extends CommonConfigTestClass {
     public void getRequiredSerializableProtectedStringConfigAttribute_withKey_xor() {
         try {
             String chosenAttr = getRandomRequiredConfigAttribute();
-            String value = "{xor}LDo8LTor";
+            String value = "{xor}LDo8LTorbm1saw==";
             String decodedValue = "secret";
             SerializableProtectedString protectedStringVal = new SerializableProtectedString(value.toCharArray());
 

@@ -429,7 +429,7 @@ public class TestSettings {
         autoauthz = "true";
         clientName = "client01";
         clientID = "client01";
-        clientSecret = "secret";
+        clientSecret = "secret1234";
         adminUser = "testuser";
         adminPswd = "testuserpwd";
         state = "Lvj9Z2l8jMSMrtWG1F3Z"; // thie will need to be updated when
@@ -595,7 +595,7 @@ public class TestSettings {
         autoauthz = "true";
         clientName = "client01";
         clientID = "client01";
-        clientSecret = "secret";
+        clientSecret = "secret1234";
         adminUser = "testuser";
         adminPswd = "testuserpwd";
         state = "Lvj9Z2l8jMSMrtWG1F3Z"; // This may need to be updated when the
@@ -1472,7 +1472,7 @@ public class TestSettings {
         issuer = protectedResource;
         clientName = "client01";
         clientID = "client01";
-        clientSecret = "secret";
+        clientSecret = "secret1234";
         adminUser = "testuser";
         adminPswd = "testuserpwd";
         scope = "scope1 scope2";

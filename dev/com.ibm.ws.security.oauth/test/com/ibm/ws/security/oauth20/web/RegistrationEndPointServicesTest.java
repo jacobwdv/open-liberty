@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -83,7 +83,7 @@ public class RegistrationEndPointServicesTest {
 
     private final static String clientId = "b0a376ec4b694b67b6baeb0604a312d8";
     private final static String clientId2 = "b01f298b2cd34893bcdec81730946e19";
-    private final static String clientSecret = "secret";
+    private final static String clientSecret = "secret1234";
     private final static String clientName = "client123";
     private final static String componentId = "TestComponent";
     private final static String redirectUri1 = "https://localhost:8999/resource/redirect1";

@@ -136,11 +136,11 @@ public class OidcUtilTest {
                 one(convClientConfig).getClientId();
                 will(returnValue("client01"));
                 allowing(convClientConfig).getClientSecret();
-                will(returnValue("secret"));
+                will(returnValue("secret1234"));
             }
         });
         final String expectedNonceCookieName = OidcStorageUtils.getNonceStorageKey("client01", state);
-        final String expectedNonceCookieValue = OidcStorageUtils.createNonceStorageValue(nonceValue, state, "secret");
+        final String expectedNonceCookieValue = OidcStorageUtils.createNonceStorageValue(nonceValue, state, "secret1234");
 
         mock.checking(new Expectations() {
             {

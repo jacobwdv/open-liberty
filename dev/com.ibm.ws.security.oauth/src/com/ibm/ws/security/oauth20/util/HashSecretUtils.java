@@ -39,7 +39,7 @@ public class HashSecretUtils {
 
     public static final int DEFAULT_SALTSIZE = 32;
     public static final int DEFAULT_ITERATIONS = 2048;
-    public static final int DEFAULT_KEYSIZE = 32;
+    public static final int DEFAULT_KEYSIZE = CryptoUtils.isFips140_3EnabledWithBetaGuard() ? CryptoUtils.FIPS_HASH_BIT_LENGTH_MINIMUM : 32;
 
     private static final int generateSaltSize = DEFAULT_SALTSIZE;
 

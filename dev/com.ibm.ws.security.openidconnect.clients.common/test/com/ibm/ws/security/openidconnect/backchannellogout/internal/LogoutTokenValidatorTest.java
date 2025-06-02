@@ -67,7 +67,7 @@ public class LogoutTokenValidatorTest extends CommonTestClass {
 
     final String CONFIG_ID = "myConfigId";
     final String CLIENT_ID = "client01";
-    final String SHARED_SECRET = "secret";
+    final String SHARED_SECRET = "secret1234";
     final String ISSUER = "https://localhost/oidc/provider/OP";
     final String TOKEN_ENDPOINT = ISSUER + "/token";
     final String SUBJECT = "testuser";

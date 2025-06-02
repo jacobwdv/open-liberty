@@ -95,7 +95,7 @@ public class oAuth20MongoSetup extends HttpServlet {
     final static String DROP_DB = "dropDB";
     final static String ADD_CLIENT = "addClient";
     final static String CLIENT_ID_WEB = "clientID";
-    final static String SECRET_WEB = "secret";
+    final static String SECRET_WEB = "secret1234";
     final static String CHECK_SECRET = "checkSecret";
     final static String PROVIDER_ID = "provider";
     final static String COMP_ID = "compID";
@@ -231,22 +231,22 @@ public class oAuth20MongoSetup extends HttpServlet {
 
                 // To make the common code easier, just leaving the
                 // OAuthConfigDerby references.
-                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient01", "secret", "dclient01", redirectUri, true,
+                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient01", "secret1234", "dclient01", redirectUri, true,
                               buildClientMetaData("dclient01", redirectUri, "true"));
-                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient02", "secret", "dclient02", redirectUri, true,
+                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient02", "secret1234", "dclient02", redirectUri, true,
                               buildClientMetaData("dclient02", redirectUri, "false"));
-                addEntryMongo(mongoDB, "OAuthConfigDerby2", "dclient01", "secret", "dclient01", redirectUri, true,
+                addEntryMongo(mongoDB, "OAuthConfigDerby2", "dclient01", "secret1234", "dclient01", redirectUri, true,
                               buildClientMetaData("dclient01", redirectUri, "true"));
-                addEntryMongo(mongoDB, "OAuthConfigDerby2", "dclient02", "secret", "dclient02", redirectUri, true,
+                addEntryMongo(mongoDB, "OAuthConfigDerby2", "dclient02", "secret1234", "dclient02", redirectUri, true,
                               buildClientMetaData("dclient02", redirectUri, "false"));
 
-                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient03", "secret", "dclient03", redirectUri, true,
+                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient03", "secret1234", "dclient03", redirectUri, true,
                               buildClientMetaData("dclient03", redirectUri, "true"));
-                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient04", "secret", "dclient04", redirectUri, true,
+                addEntryMongo(mongoDB, DEFAULT_COMPID, "dclient04", "secret1234", "dclient04", redirectUri, true,
                               buildClientMetaData("dclient03", redirectUri, "true"));
 
                 // client for OAuthGrantTypesCustomStoreTest
-                addEntryMongo(mongoDB, "OAuthConfigSampleGrantTypes", "client03", "{xor}LDo8LTor", "client03",
+                addEntryMongo(mongoDB, "OAuthConfigSampleGrantTypes", "client03", "{xor}LDo8LTorbm1saw==", "client03",
                               redirectUri2, true, buildClientMetaData("client03", redirectUri2, "true"));
 
                 queryTableMongo();
@@ -577,7 +577,7 @@ public class oAuth20MongoSetup extends HttpServlet {
 
         metaD.put("token_endpoint_auth_method", "client_secret_basic");
         metaD.put("client_id", clientId);
-        metaD.put("client_secret", "secret");
+        metaD.put("client_secret", "secret1234");
         metaD.put("client_name", clientId);
         metaD.put("introspect_tokens", introspectTokens);
         return metaD;
@@ -597,7 +597,7 @@ public class oAuth20MongoSetup extends HttpServlet {
                            + providerID + " " + secret + " " + salt + " " + algorithm);
 
         if (clientID == null || secret.equals(null)) {
-            throw new IllegalArgumentException("Received null for " + (clientID.equals(null) ? "clientID" : "secret"));
+            throw new IllegalArgumentException("Received null for " + (clientID.equals(null) ? "clientID" : "secret1234"));
         }
 
         String redirectUri = "http://localhost:" + port + "/oauthclient/redirect.jsp";
