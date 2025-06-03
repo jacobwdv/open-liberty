@@ -27,7 +27,7 @@
 		scope="openid profile"
 		clientId="clientNoIntrospect"
 		clientSecret="{xor}LDo8LTorbm1saw=="
-		sharedKey="secret1234"
+		sharedKey="secret"
 		httpsRequired="false"
 		inboundPropagation="required"
 		authorizationEndpointUrl="http://localhost:${bvt.prop.security_1_HTTP_default}/${providerRoot}/endpoint/${providerSample}/authorize"
