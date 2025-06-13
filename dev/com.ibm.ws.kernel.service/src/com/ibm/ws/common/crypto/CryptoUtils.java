@@ -96,6 +96,22 @@ public class CryptoUtils {
 
     public static final int DESEDE_KEY_LENGTH_BYTES = 24;
 
+    /**
+     * For tracking all uses of PBKDF2WithHmacSHA1
+     * <p>Example Usages:
+     * -AESKeyManager.java for AES_V0(AES-128) password encryption, default prior to 25.0.0.2
+     * -PasswordHashGenerator.java for password hashing, default prior to 25.0.0.3
+     */
+    public static final String PBKDF2_WITH_HMAC_SHA1 = "PBKDF2WithHmacSHA1";
+
+    /**
+     * For tracking all uses of PBKDF2WithHmacSHA512
+     * <p>Example Usages:
+     * -AESKeyManager.java for AES_V1(AES-256) password encryption, default 25.0.0.2+
+     * -PasswordHashGenerator.java for password hashing, default 25.0.0.3+
+     */
+    public static final String PBKDF2_WITH_HMAC_SHA512 = "PBKDF2WithHmacSHA512";
+
     // FIPS minimum allowable salt length in bytes
     public static final int FIPS1403_PBKDF2_MINIMUM_SALT_LENGTH_BYTES = 16;
     // FIPS recommended salt length in bytes
@@ -114,6 +130,28 @@ public class CryptoUtils {
 
     /** Algorithm used for encryption in LTPA and audit. */
     public static final String ENCRYPT_ALGORITHM = ENCRYPT_ALGORITHM_AES;
+
+    /**
+     * AES Password Encryption Constants, used in AESKeyManager.java
+     * Uses:
+     * PBKDF2WithHmacSHA1
+     * PBKDF2WithHmacSHA512
+     * AES_128_KEY_LENGTH_BITS
+     * AES_256_KEY_LENGTH_BITS
+     **/
+    /**
+     * For tracking all 128-bit AES key usages
+     * <p>Example Usages:
+     * -AESKeyManager.java for AES_V0(AES-128) password encryption</li>
+     */
+    public static final int AES_128_KEY_LENGTH_BITS = AES_128_KEY_LENGTH_BYTES * 8;
+
+    /**
+     * For tracking all 256-bit AES key usages
+     * <p>Example Usages:
+     * -AESKeyManager.java for AES_V1(AES-256) password encryption
+     */
+    public static final int AES_256_KEY_LENGTH_BITS = AES_256_KEY_LENGTH_BYTES * 8;
 
     private static Map<String, String> secureAlternative = new HashMap<>();
     static {
