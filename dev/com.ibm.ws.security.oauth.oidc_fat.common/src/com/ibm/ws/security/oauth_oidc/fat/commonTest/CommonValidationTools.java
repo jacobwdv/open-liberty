@@ -2622,13 +2622,8 @@ public class CommonValidationTools {
         assertNotNull("Should have retrieved an algorithm for client " + testSettings.getClientID(), algorithm);
         assertNotSame("Algorithm not found for client " + testSettings.getClientID(), "null_algorithm", algorithm);
 
-        // Log.info(thisClass, thisMethod, "salt retrieved: " + salt + " algorithm
-        // retrieved:" + algorithm);
-        System.out.println("JAKE: salt:" + salt + "algorithm: " + algorithm);
-        String hashSecret = HashSecretUtils.hashSecret(clientSecret, testSettings.getClientID(), false, salt, algorithm,
-                0, 0);
-        System.out.println("JAKE: hashSecret: " + hashSecret);
-        return hashSecret;
+        // Log.info(thisClass, thisMethod, "salt retrieved: " + salt + " algorithm retrieved:" + algorithm);
+        return HashSecretUtils.hashSecret(clientSecret, testSettings.getClientID(), false, salt, algorithm, 0, 0);
 
     }
 
