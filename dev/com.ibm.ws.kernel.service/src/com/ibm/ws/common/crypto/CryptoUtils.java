@@ -374,7 +374,9 @@ public class CryptoUtils {
         MessageDigest md1 = null;
         try {
             if (fipsEnabled) {
-                if (isSemeruFips()) {
+                if (useEnhancedSecurityAlgorithms()) {
+                    md1 = MessageDigest.getInstance(MESSAGE_DIGEST_ALGORITHM_SHA_512);
+                } else if (isSemeruFips()) {
                     md1 = MessageDigest.getInstance(MESSAGE_DIGEST_ALGORITHM_SHA_512,
                                                     OPENJCE_PLUS_FIPS_NAME);
                 } else {
