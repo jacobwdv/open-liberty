@@ -85,7 +85,8 @@ encode.option-key.base64Key=\
 \ \ \ \ --base64Key=base64Key
 encode.option-desc.base64Key=\
 \tA base64 encoded AES-256 bit key to be used to encrypt and decrypt the\n\
-\tpassword.
+\tpassword. The key can be provided to the server by defining the \n\
+\tvariable wlp.aes.encryption.key whose value is the key.
 encode.option-key.xmlFile=\
 \ \ \ \ --xmlFile=xmlFile
 encode.option-desc.xmlFile=\
@@ -274,7 +275,8 @@ createLTPAKeys.option-key.base64Key=\
 \ \ \ \ --passwordBase64Key=base64Key
 createLTPAKeys.option-desc.base64Key=\
 \tA base64 encoded AES-256 bit key to be used to encrypt and decrypt the\n\
-\tpassword.
+\tpassword. The key can be provided to the server by defining the \n\
+\tvariable wlp.aes.encryption.key whose value is the key.
 createLTPAKeys.option-key.xmlFile=\
 \ \ \ \ --passwordXmlFile=xmlFile
 createLTPAKeys.option-desc.xmlFile=\
