@@ -21,7 +21,10 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FilenameUtils;
 
@@ -30,6 +33,7 @@ import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.websphere.crypto.UnsupportedCryptoAlgorithmException;
 import com.ibm.ws.crypto.certificateutil.DefaultSSLCertificateCreator;
 import com.ibm.ws.crypto.certificateutil.DefaultSubjectDN;
+import com.ibm.ws.kernel.productinfo.ProductInfo;
 import com.ibm.ws.security.utility.IFileUtility;
 import com.ibm.ws.security.utility.SecurityUtilityReturnCodes;
 import com.ibm.ws.security.utility.utils.ConsoleWrapper;
@@ -42,11 +46,8 @@ public class CreateSSLCertificateTask extends BaseCommandTask {
 
     static final String ARG_SERVER = "--server";
     static final String ARG_CLIENT = "--client";
-    static final String ARG_PASSWORD = "--password";
     static final String ARG_VALIDITY = "--validity";
     static final String ARG_SUBJECT = "--subject";
-    static final String ARG_ENCODING = "--passwordEncoding";
-    static final String ARG_KEY = "--passwordKey";
     static final String ARG_CREATE_CONFIG_FILE = "--createConfigFile";
     static final String ARG_KEYSIZE = "--keySize";
     static final String ARG_SIGALG = "--sigAlg";
@@ -58,6 +59,9 @@ public class CreateSSLCertificateTask extends BaseCommandTask {
 
     static final String JKS = "jks";
     static final String PKCS12 = "pkcs12";
+
+    private static final List<String> BETA_ARG_TABLE = Arrays.asList(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE);
+    private static final List<String> BETA_OPTS = BETA_ARG_TABLE.stream().map(s -> s.startsWith("--") ? s.substring(2) : s).collect(Collectors.toList());
 
     private final DefaultSSLCertificateCreator creator;
     private final IFileUtility fileUtility;
@@ -186,10 +190,22 @@ public class CreateSSLCertificateTask extends BaseCommandTask {
         List<String> extInfo = getExtInfoArgumentValues(ARG_EXT, args);
 
         try {
-            String encoding = getArgumentValue(ARG_ENCODING, args, PasswordUtil.getDefaultEncoding());
-            String key = getArgumentValue(ARG_KEY, args, null);
+            Map<String, String> argProps = new HashMap<>();
+            String encoding = getArgumentValue(BaseCommandTask.ARG_PASSWORD_ENCODING, args, PasswordUtil.getDefaultEncoding());
+            argProps.put(BaseCommandTask.ARG_PASSWORD_ENCODING, encoding);
+
+            String key = getArgumentValue(BaseCommandTask.ARG_PASSWORD_KEY, args, null);
+            argProps.put(BaseCommandTask.ARG_PASSWORD_KEY, key);
+
+            String xmlFile = getArgumentValue(BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE, args, null);
+            argProps.put(BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE, xmlFile);
+
+            String base64Key = getArgumentValue(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, args, null);
+            argProps.put(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, base64Key);
+
+            Map<String, String> props = BaseCommandTask.convertToProperties(argProps, stdout);
             stdout.println(getMessage("sslCert.createKeyStore", location));
-            String encodedPassword = PasswordUtil.encode(password, encoding, key);
+            String encodedPassword = PasswordUtil.encode(password, encoding, props);
             creator.createDefaultSSLCertificate(location, password, keyType, null, validity, subjectDN, keySize, sigAlg, extInfo);
             String xmlSnippet = null;
             if (serverName != null) {
@@ -225,12 +241,16 @@ public class CreateSSLCertificateTask extends BaseCommandTask {
     /** {@inheritDoc} */
     @Override
     boolean isKnownArgument(String arg) {
-        return arg.equals(ARG_SERVER) || arg.equals(ARG_PASSWORD) ||
-               arg.equals(ARG_VALIDITY) || arg.equals(ARG_SUBJECT) ||
-               arg.equals(ARG_ENCODING) || arg.equals(ARG_KEY) ||
-               arg.equals(ARG_CREATE_CONFIG_FILE) || arg.equals(ARG_KEYSIZE) ||
-               arg.equals(ARG_CLIENT) || arg.equals(ARG_SIGALG) ||
-               arg.equals(ARG_KEY_TYPE) || arg.equals(ARG_EXT);
+        boolean isKnown = arg.equals(ARG_SERVER) || arg.equals(ARG_PASSWORD) ||
+                          arg.equals(ARG_VALIDITY) || arg.equals(ARG_SUBJECT) ||
+                          arg.equals(ARG_PASSWORD_ENCODING) || arg.equals(ARG_PASSWORD_KEY) ||
+                          arg.equals(ARG_CREATE_CONFIG_FILE) || arg.equals(ARG_KEYSIZE) ||
+                          arg.equals(ARG_CLIENT) || arg.equals(ARG_SIGALG) ||
+                          arg.equals(ARG_KEY_TYPE) || arg.equals(ARG_EXT);
+        if (!isKnown && ProductInfo.getBetaEdition()) {
+            isKnown = arg.equals(ARG_PASSWORD_BASE64_KEY) || arg.equals(ARG_PASSWORD_ENCRYPTION_XML_FILE);
+        }
+        return isKnown;
     }
 
     /** {@inheritDoc} */
@@ -414,4 +434,8 @@ public class CreateSSLCertificateTask extends BaseCommandTask {
         return outputFile;
     }
 
+    @Override
+    protected List<String> getBetaOptions() {
+        return BETA_OPTS;
+    }
 }

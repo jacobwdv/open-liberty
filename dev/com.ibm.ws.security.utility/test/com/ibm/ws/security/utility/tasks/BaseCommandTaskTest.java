@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -13,10 +13,17 @@
 package com.ibm.ws.security.utility.tasks;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jmock.Expectations;
 import org.jmock.Mockery;
@@ -24,7 +31,11 @@ import org.jmock.Sequence;
 import org.jmock.integration.junit4.JUnit4Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
+import com.ibm.websphere.crypto.PasswordUtil;
+import com.ibm.ws.kernel.productinfo.ProductInfo;
 import com.ibm.ws.security.utility.SecurityUtilityReturnCodes;
 import com.ibm.ws.security.utility.utils.ConsoleWrapper;
 
@@ -438,6 +449,52 @@ public class BaseCommandTaskTest {
 
         String[] args = new String[] { "testUtility", TestTask.ARG_REQ };
         task.validateArgumentList(args, TestTask.FLAG_ARGS);
+    }
+
+    @Test
+    public void validateEncodingProperties() throws Exception {
+        Path tempFile = Files.createTempFile("test-keys", ".xml");
+
+        try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class);) {
+            productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
+
+            testEncodingPropertyConversion("--base64Key", PasswordUtil.PROPERTY_AES_KEY, "test");
+            testEncodingPropertyConversion("--passwordBase64Key", PasswordUtil.PROPERTY_AES_KEY, "test");
+            testEncodingPropertyConversion("--key", PasswordUtil.PROPERTY_CRYPTO_KEY, "test");
+            testEncodingPropertyConversion("--passwordKey", PasswordUtil.PROPERTY_CRYPTO_KEY, "test");
+
+            String aesKey = "hvdeCUr6rpcTFnCikBSdJPXlxvcdqoQSE0LGwkJz53E=";
+
+            String xml = "<server>\n<variable name=\"wlp.aes.encryption.key\" value=\"" + aesKey + "\" />\n</server>";
+            Files.write(tempFile, xml.getBytes(StandardCharsets.UTF_8), StandardOpenOption.WRITE);
+            testEncodingPropertyConversion("--xmlFile", PasswordUtil.PROPERTY_AES_KEY, tempFile.toString(), aesKey);
+            testEncodingPropertyConversion("--passwordXmlFile", PasswordUtil.PROPERTY_AES_KEY, tempFile.toString(), aesKey);
+
+            xml = "<server>\n<variable name=\"wlp.password.encryption.key\" value=\"" + aesKey + "\" />\n</server>";
+            Files.write(tempFile, xml.getBytes(StandardCharsets.UTF_8), StandardOpenOption.WRITE);
+            testEncodingPropertyConversion("--xmlFile", PasswordUtil.PROPERTY_CRYPTO_KEY, tempFile.toString(), aesKey);
+            testEncodingPropertyConversion("--passwordXmlFile", PasswordUtil.PROPERTY_CRYPTO_KEY, tempFile.toString(), aesKey);
+
+        } finally {
+            Files.delete(tempFile);
+        }
+    }
+
+    /**
+     * @param testValue
+     * @throws Exception
+     */
+    private void testEncodingPropertyConversion(String inputArg, String outputKey, String val) throws Exception {
+        testEncodingPropertyConversion(inputArg, outputKey, val, val);
+    }
+
+    private void testEncodingPropertyConversion(String inputArg, String outputKey, String inVal, String outVal) throws Exception {
+        try (PrintStream printStreamMock = Mockito.mock(PrintStream.class)) {
+            Map<String, String> args = new HashMap<>();
+            args.put(inputArg, inVal);
+            Map<String, String> props = BaseCommandTask.convertToProperties(args, printStreamMock);
+            assertTrue(props.get(outputKey).equals(outVal));
+        }
     }
 
 }

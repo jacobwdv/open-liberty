@@ -16,10 +16,14 @@ import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.ibm.websphere.crypto.PasswordUtil;
+import com.ibm.ws.crypto.util.AESKeyManager;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
 import com.ibm.ws.security.utility.SecurityUtilityTask;
 import com.ibm.ws.security.utility.utils.CommandUtils;
@@ -27,11 +31,45 @@ import com.ibm.ws.security.utility.utils.ConsoleWrapper;
 
 public abstract class BaseCommandTask implements SecurityUtilityTask {
 
-    protected static final boolean IS_BETA_EDITION = ProductInfo.getBetaEdition();
-
     public static final String NL = System.getProperty("line.separator");
 
     protected final String scriptName;
+
+    static final String ARG_PASSWORD_ENCRYPTION_XML_FILE = "--passwordXmlFile";
+
+    static final String ARG_PASSWORD_BASE64_KEY = "--passwordBase64Key";
+
+    static final String ARG_PASSWORD_KEY = "--passwordKey";
+
+    static final String ARG_PASSWORD_ENCODING = "--passwordEncoding";
+
+    static final String ARG_KEY_LABEL = "--keyLabel";
+
+    static final String ARG_KEYRING_TYPE = "--keyringType";
+
+    static final String ARG_KEYRING = "--keyring";
+
+    static final String ARG_HASH_ENCODED = "--encoded"; // this is for debug
+
+    static final String ARG_HASH_ALGORITHM = "--algorithm";
+
+    static final String ARG_HASH_ITERATION = "--iteration";
+
+    static final String ARG_HASH_SALT = "--salt";
+
+    static final String ARG_LIST_CUSTOM = "--listCustom";
+
+    static final String ARG_NO_TRIM = "--notrim";
+
+    static final String ARG_PASSWORD = "--password";
+
+    static final String ARG_ENCODING = "--encoding";
+
+    public static final String ARG_ENCRYPTION_XML_FILE = "--xmlFile";
+
+    public static final String ARG_BASE64_KEY = "--base64Key";
+
+    public static final String ARG_KEY = "--key";
 
     public BaseCommandTask(String scriptName) {
         this.scriptName = scriptName;
@@ -86,7 +124,7 @@ public abstract class BaseCommandTask implements SecurityUtilityTask {
      * @return
      */
     private boolean isBlockedOption(String option) {
-        if (IS_BETA_EDITION) {
+        if (ProductInfo.getBetaEdition()) {
             return false;
         } else {
             return getBetaOptions().stream().anyMatch(p -> option.endsWith(p));
@@ -330,6 +368,102 @@ public abstract class BaseCommandTask implements SecurityUtilityTask {
                 }
             }
         }
+    }
+
+    /**
+     * Convert the properties for encoding from the command line parameters.
+     *
+     * @param stdout a PrintStream to write informational messages.
+     * @throws Exception
+     */
+    protected static Map<String, String> convertToProperties(Map<String, String> argMap, PrintStream stdout) throws Exception {
+        HashMap<String, String> props = new HashMap<String, String>();
+
+        String value = argMap.get(BaseCommandTask.ARG_KEY);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_CRYPTO_KEY, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_PASSWORD_KEY);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_CRYPTO_KEY, value);
+        }
+        if (argMap.containsKey(BaseCommandTask.ARG_NO_TRIM)) {
+            props.put(PasswordUtil.PROPERTY_NO_TRIM, "true");
+        }
+        value = argMap.get(BaseCommandTask.ARG_HASH_SALT);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_HASH_SALT, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_HASH_ITERATION);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_HASH_ITERATION, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_HASH_ALGORITHM);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_HASH_ALGORITHM, value);
+        }
+        // following value are for debug
+        value = argMap.get(BaseCommandTask.ARG_HASH_ENCODED);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_HASH_ENCODED, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_KEYRING);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_KEYRING, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_KEYRING_TYPE);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_KEYRING_TYPE, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_KEY_LABEL);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_KEY_LABEL, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_BASE64_KEY);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_AES_KEY, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_PASSWORD_BASE64_KEY);
+        if (value != null) {
+            props.put(PasswordUtil.PROPERTY_AES_KEY, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_ENCRYPTION_XML_FILE);
+        if (value != null) {
+            handleXmlArg(stdout, props, value);
+        }
+        value = argMap.get(BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE);
+        if (value != null) {
+            handleXmlArg(stdout, props, value);
+        }
+        return props;
+    }
+
+    /**
+     * @param stdout
+     * @param props
+     * @param value
+     * @throws Exception
+     */
+    protected static void handleXmlArg(PrintStream stdout, HashMap<String, String> props, String value) throws Exception {
+        Map<String, String> aesEncodingProps = PasswordUtil.parseAesEncryptionXmlFile(value);
+        if (aesEncodingProps.containsKey(PasswordUtil.PROPERTY_CRYPTO_KEY) && aesEncodingProps.containsKey(PasswordUtil.PROPERTY_AES_KEY)) {
+            stdout.println(getMessage("encode.xmlEncryptionAmbiguous", AESKeyManager.NAME_WLP_BASE64_AES_ENCRYPTION_KEY, AESKeyManager.NAME_WLP_PASSWORD_ENCRYPTION_KEY));
+        }
+        String propertyFound;
+
+        //if both are specified in the xml file, use the BASE64 key.
+        if (aesEncodingProps.containsKey(PasswordUtil.PROPERTY_AES_KEY)) {
+            props.put(PasswordUtil.PROPERTY_AES_KEY, aesEncodingProps.get(PasswordUtil.PROPERTY_AES_KEY));
+            propertyFound = AESKeyManager.NAME_WLP_BASE64_AES_ENCRYPTION_KEY;
+        } else if (aesEncodingProps.containsKey(PasswordUtil.PROPERTY_CRYPTO_KEY)) {
+            String key = aesEncodingProps.get(PasswordUtil.PROPERTY_CRYPTO_KEY);
+            props.put(PasswordUtil.PROPERTY_CRYPTO_KEY, key);
+            propertyFound = AESKeyManager.NAME_WLP_PASSWORD_ENCRYPTION_KEY;
+        } else {
+            throw new IllegalArgumentException(getMessage("encode.xmlMissingEncryptionVariables", AESKeyManager.NAME_WLP_BASE64_AES_ENCRYPTION_KEY,
+                                                          AESKeyManager.NAME_WLP_PASSWORD_ENCRYPTION_KEY));
+        }
+        stdout.println(getMessage("encode.xmlVariableFound", propertyFound));
     }
 
 }

@@ -41,11 +41,7 @@ public class CreateLTPAKeysTask extends BaseCommandTask {
     static final String ARG_PASSWORD = "--password";
     static final String ARG_SERVER = "--server";
     static final String ARG_FILE = "--file";
-    static final String ARG_ENCODING = "--passwordEncoding";
-    static final String ARG_KEY = "--passwordKey";
-    static final String ARG_BASE64_KEY = "--passwordBase64Key";
-    static final String ARG_ENCRYPTION_XML_FILE = "--passwordXmlFile";
-    private static final List<String> BETA_ARG_TABLE = Arrays.asList(ARG_BASE64_KEY, ARG_ENCRYPTION_XML_FILE);
+    private static final List<String> BETA_ARG_TABLE = Arrays.asList(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE);
     private static final List<String> BETA_OPTS = BETA_ARG_TABLE.stream().map(s -> s.startsWith("--") ? s.substring(2) : s).collect(Collectors.toList());
     private final LTPAKeyFileUtility ltpaKeyFileUtil;
     private final IFileUtility fileUtility;
@@ -86,10 +82,10 @@ public class CreateLTPAKeysTask extends BaseCommandTask {
     @Override
     boolean isKnownArgument(String arg) {
         boolean isKnown = arg.equals(ARG_SERVER) || arg.equals(ARG_PASSWORD) ||
-                          arg.equals(ARG_ENCODING) || arg.equals(ARG_KEY) ||
+                          arg.equals(ARG_PASSWORD_ENCODING) || arg.equals(ARG_PASSWORD_KEY) ||
                           arg.equals(ARG_FILE);
         if (!isKnown && ProductInfo.getBetaEdition()) {
-            isKnown = arg.equals(ARG_BASE64_KEY) || arg.equals(ARG_ENCRYPTION_XML_FILE);
+            isKnown = arg.equals(ARG_PASSWORD_BASE64_KEY) || arg.equals(ARG_PASSWORD_ENCRYPTION_XML_FILE);
 
         }
         return isKnown;
@@ -186,14 +182,14 @@ public class CreateLTPAKeysTask extends BaseCommandTask {
         } else {
             Map<String, String> argMap = new HashMap<>();
             String password = getArgumentValue(ARG_PASSWORD, args, null);
-            String encoding = getArgumentValue(ARG_ENCODING, args, PasswordUtil.getDefaultEncoding());
-            String key = getArgumentValue(ARG_KEY, args, null);
-            String base64Key = getArgumentValue(ARG_BASE64_KEY, args, null);
-            String xmlFile = getArgumentValue(ARG_ENCRYPTION_XML_FILE, args, null);
-            argMap.put(EncodeTask.ARG_KEY, key);
-            argMap.put(EncodeTask.ARG_BASE64_KEY, base64Key);
-            argMap.put(EncodeTask.ARG_ENCRYPTION_XML_FILE, xmlFile);
-            Map<String, String> props = EncodeTask.convertToProperties(argMap, stdout);
+            String encoding = getArgumentValue(BaseCommandTask.ARG_PASSWORD_ENCODING, args, PasswordUtil.getDefaultEncoding());
+            String key = getArgumentValue(BaseCommandTask.ARG_PASSWORD_KEY, args, null);
+            argMap.put(BaseCommandTask.ARG_PASSWORD_KEY, key);
+            String base64Key = getArgumentValue(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, args, null);
+            argMap.put(BaseCommandTask.ARG_PASSWORD_BASE64_KEY, base64Key);
+            String xmlFile = getArgumentValue(BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE, args, null);
+            argMap.put(BaseCommandTask.ARG_PASSWORD_ENCRYPTION_XML_FILE, xmlFile);
+            Map<String, String> props = BaseCommandTask.convertToProperties(argMap, stdout);
             String encodedPassword = PasswordUtil.encode(password, encoding, props);
 
             String xmlSnippet;

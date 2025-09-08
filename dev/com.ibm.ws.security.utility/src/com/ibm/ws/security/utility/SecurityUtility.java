@@ -170,7 +170,7 @@ public class SecurityUtility extends UtilityTemplate {
         util.registerTask(new CreateLTPAKeysTask(ltpaKeyFileCreator, fileUtil, SCRIPT_NAME));
         util.registerTask(new TLSProfilerTask(fileUtil, SCRIPT_NAME));
         if (ProductInfo.getBetaEdition()) {
-            util.registerTask(new GenerateTask(SCRIPT_NAME));
+            util.registerTask(new GenerateTask(fileUtil, SCRIPT_NAME));
         }
 
         // Kick everything off

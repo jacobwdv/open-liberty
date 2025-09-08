@@ -152,21 +152,21 @@ public class PasswordUtilTest {
     public void testAESEncoding() throws Exception {
         try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class)) {
             productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
-            
-        String encoding = PasswordUtil.encode("WebAS", "aes");
-        assertTrue("The encoded password should start with {aes} " + encoding, encoding.startsWith("{aes}"));
-        String encoding2 = PasswordUtil.encode("WebAS", "aes");
-        assertFalse("Encoding the same password twice should result in different encodings: " + encoding + " and " + encoding2, encoding.equals(encoding2));
 
-        assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode(encoding));
-        assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode(encoding2));
-        assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode("{aes}AGTpzRDW//VE3Jshg1fd89rxw/JMjHfFM9UdYdVNIUt2"));
+            String encoding = PasswordUtil.encode("WebAS", "aes");
+            assertTrue("The encoded password should start with {aes} " + encoding, encoding.startsWith("{aes}"));
+            String encoding2 = PasswordUtil.encode("WebAS", "aes");
+            assertFalse("Encoding the same password twice should result in different encodings: " + encoding + " and " + encoding2, encoding.equals(encoding2));
 
-        assertEquals("Did not decode password encoded with AES_V0 (AES-128) encoded password", "alternatepwd",
-                     PasswordUtil.decode("{aes}AEmVKa+jOeA7pos+sSfpHNmH1MVfwg8ZoV29iDi6I0ZGcov6hSZsAxMhFr91jTSBYQ=="));
-        assertEquals("Did not decode password encoded with AES_V1 (AES-256) encoded password", "alternatepwd",
-                     PasswordUtil.decode("{aes}ARABGAM7S4HrIRtZWJ229TnxuKZrrPN3dsKrrQzCQE/3U5F4zp3UrDQ+Czmnvz1kaQyN7JktDzieJxelwu077ZYET2V+7/1Gi37iztr7lY0i+j4dlHOFIi5PESnZ7V8XOmdSbH9DSgkuJaXNoEqb"));
-    }
+            assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode(encoding));
+            assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode(encoding2));
+            assertEquals("The password was not decoded correctly", "WebAS", PasswordUtil.decode("{aes}AGTpzRDW//VE3Jshg1fd89rxw/JMjHfFM9UdYdVNIUt2"));
+
+            assertEquals("Did not decode password encoded with AES_V0 (AES-128) encoded password", "alternatepwd",
+                         PasswordUtil.decode("{aes}AEmVKa+jOeA7pos+sSfpHNmH1MVfwg8ZoV29iDi6I0ZGcov6hSZsAxMhFr91jTSBYQ=="));
+            assertEquals("Did not decode password encoded with AES_V1 (AES-256) encoded password", "alternatepwd",
+                         PasswordUtil.decode("{aes}ARABGAM7S4HrIRtZWJ229TnxuKZrrPN3dsKrrQzCQE/3U5F4zp3UrDQ+Czmnvz1kaQyN7JktDzieJxelwu077ZYET2V+7/1Gi37iztr7lY0i+j4dlHOFIi5PESnZ7V8XOmdSbH9DSgkuJaXNoEqb"));
+        }
     }
 
     @Test
@@ -219,7 +219,7 @@ public class PasswordUtilTest {
             mock.when(() -> AESKeyManager.getKeyCharsUsingResolver(KeyVersion.AES_V2, null)).thenReturn(keyString.toCharArray());
 
             String encodedPassword = PasswordUtil.encode(decoded_string, "aes", props);
-
+            assertEquals("AES_V2 byte marker not set", getAesVersionFromEncodedPassword(encodedPassword), 2);
             assertEquals("Decoded value does not match original value", decoded_string, PasswordUtil.decode(encodedPassword));
 
             // two invocations, one for encode and one for decode.
@@ -227,6 +227,14 @@ public class PasswordUtilTest {
             mock.verify(() -> AESKeyManager.getKeyCharsUsingResolver(KeyVersion.AES_V2, null), times(1));
 
         }
+    }
+
+    /**
+     * @param encodedPassword
+     * @return
+     */
+    private byte getAesVersionFromEncodedPassword(String encodedPassword) {
+        return Base64.getDecoder().decode(encodedPassword.substring(5))[0];
     }
 
     /**
@@ -259,7 +267,7 @@ public class PasswordUtilTest {
     public void testInvalidBase64KeyFails() {
         try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class)) {
             productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
-            
+
             Map<String, String> props = new HashMap<>();
             // Invalid base64 string: contains characters not valid in Base64 encoding
             String invalidKey = "Not@Valid*Base64==";
@@ -273,7 +281,7 @@ public class PasswordUtilTest {
             } catch (Exception e) {
                 // Verify we get the expected exception type
                 assertTrue("Exception should be InvalidPasswordEncodingException",
-                          e instanceof InvalidPasswordEncodingException);
+                           e instanceof InvalidPasswordEncodingException);
             }
         }
     }
@@ -287,18 +295,18 @@ public class PasswordUtilTest {
 
         try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class)) {
             productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
-        // Use a path that definitely doesn't exist
-        String invalidPath = "/non/existent/path/to/aeskey.xml";
+            // Use a path that definitely doesn't exist
+            String invalidPath = "/non/existent/path/to/aeskey.xml";
 
-        try {
-            PasswordUtil.parseAesEncryptionXmlFile(invalidPath);
-            fail("Expected IOException for non-existent XML file path");
-        } catch (Exception e) {
-            // We expect some kind of IOException or parsing failure
-            assertTrue(
-                       "Unexpected exception type: " + e,
-                       e instanceof IOException);
-        }
+            try {
+                PasswordUtil.parseAesEncryptionXmlFile(invalidPath);
+                fail("Expected IOException for non-existent XML file path");
+            } catch (Exception e) {
+                // We expect some kind of IOException or parsing failure
+                assertTrue(
+                           "Unexpected exception type: " + e,
+                           e instanceof IOException);
+            }
         }
     }
 
@@ -311,24 +319,24 @@ public class PasswordUtilTest {
 
         try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class)) {
             productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
-        // Create a temporary file with invalid XML content
-        File badXml = File.createTempFile("bad-xml", ".xml");
-        try (FileWriter writer = new FileWriter(badXml)) {
-            // Write intentionally malformed XML content
-            writer.write("<variable name=\"wlp.aes.encryption.key\" value=\"someValue\" >"); // Missing closing tag
-        }
+            // Create a temporary file with invalid XML content
+            File badXml = File.createTempFile("bad-xml", ".xml");
+            try (FileWriter writer = new FileWriter(badXml)) {
+                // Write intentionally malformed XML content
+                writer.write("<variable name=\"wlp.aes.encryption.key\" value=\"someValue\" >"); // Missing closing tag
+            }
 
-        try {
-            PasswordUtil.parseAesEncryptionXmlFile(badXml.getAbsolutePath());
-            fail("Expected SAXException or ParserConfigurationException for malformed XML content");
-        } catch (Exception e) {
-            assertTrue(
-                       "Unexpected exception type: " + e,
-                       e instanceof SAXException || e instanceof ParserConfigurationException);
-        } finally {
-            // Clean up the temporary file
-            badXml.delete();
+            try {
+                PasswordUtil.parseAesEncryptionXmlFile(badXml.getAbsolutePath());
+                fail("Expected SAXException or ParserConfigurationException for malformed XML content");
+            } catch (Exception e) {
+                assertTrue(
+                           "Unexpected exception type: " + e,
+                           e instanceof SAXException || e instanceof ParserConfigurationException);
+            } finally {
+                // Clean up the temporary file
+                badXml.delete();
+            }
         }
-    }
     }
 }

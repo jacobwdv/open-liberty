@@ -226,6 +226,20 @@ sslCert.option-desc.ext=\
 \tcommand -ext flag. This flag can be used multiple times on the command\n\ 
 line.
 
+sslCert.option-key.passwordBase64Key=\
+\ \ \ \ --passwordBase64Key=base64Key
+sslCert.option-desc.passwordBase64Key=\
+\tA base64 encoded AES-256 bit key to be used to encrypt and decrypt the\n\
+\tpassword. The key can be provided to the server by defining the \n\
+\tvariable wlp.aes.encryption.key whose value is the key.
+sslCert.option-key.passwordXmlFile=\
+\ \ \ \ --passwordXmlFile=xmlFile
+sslCert.option-desc.passwordXmlFile=\
+\tAn XML file with a variable named wlp.password.encryption.key or\n\
+\twlp.aes.encryption.key with valid values respectively. If both variables\n\
+\tare specified, the wlp.aes.encryption.key setting is used to encode\n\
+\tthe password.
+
 # -------- CREATE LTPA KEYS OPTIONS --------------------------------------#
 # List of descriptive text for options. Use "\n\" for line continuations.
 # The code provides no whitespace: begin keys with "\ \ \ \ " for leading
@@ -271,15 +285,15 @@ createLTPAKeys.option-desc.password.key=\
 \tprovided to the server by defining the variable\n\
 \twlp.password.encryption.key whose value is the key. If this option is\n\
 \tnot provided a default key shall be used.
-createLTPAKeys.option-key.base64Key=\
+createLTPAKeys.option-key.passwordBase64Key=\
 \ \ \ \ --passwordBase64Key=base64Key
-createLTPAKeys.option-desc.base64Key=\
+createLTPAKeys.option-desc.passwordBase64Key=\
 \tA base64 encoded AES-256 bit key to be used to encrypt and decrypt the\n\
 \tpassword. The key can be provided to the server by defining the \n\
 \tvariable wlp.aes.encryption.key whose value is the key.
-createLTPAKeys.option-key.xmlFile=\
+createLTPAKeys.option-key.passwordXmlFile=\
 \ \ \ \ --passwordXmlFile=xmlFile
-createLTPAKeys.option-desc.xmlFile=\
+createLTPAKeys.option-desc.passwordXmlFile=\
 \tAn XML file with a variable named wlp.password.encryption.key or\n\
 \twlp.aes.encryption.key with valid values respectively. If both variables\n\
 \tare specified, the wlp.aes.encryption.key setting is used to encode\n\
