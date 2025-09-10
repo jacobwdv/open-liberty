@@ -38,6 +38,7 @@ import org.mockito.Mockito;
 
 import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
+import com.ibm.ws.crypto.util.EncryptionXmlParser;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
 import com.ibm.ws.security.utility.IFileUtility;
 import com.ibm.ws.security.utility.SecurityUtilityReturnCodes;
@@ -488,7 +489,7 @@ public class CreateLTPAKeysTaskTest {
     @Test
     public void handleTask_specifiedFile_fileCreated_xmlFile_aes() throws Exception {
         try (MockedStatic<ProductInfo> productInfoMock = Mockito.mockStatic(ProductInfo.class);
-                        MockedStatic<PasswordUtil> passwordUtil = Mockito.mockStatic(PasswordUtil.class, Mockito.CALLS_REAL_METHODS)) {
+                        MockedStatic<EncryptionXmlParser> passwordUtil = Mockito.mockStatic(EncryptionXmlParser.class, Mockito.CALLS_REAL_METHODS)) {
             productInfoMock.when(() -> ProductInfo.getBetaEdition()).thenReturn(true);
 
             Map<String, String> props = new HashMap<>();
@@ -496,7 +497,7 @@ public class CreateLTPAKeysTaskTest {
             String xmlFilePath = "keys.xml";
 
             passwordUtil.when(() -> {
-                PasswordUtil.parseAesEncryptionXmlFile(xmlFilePath);
+                EncryptionXmlParser.parseAesEncryptionXmlFile(xmlFilePath);
             }).thenReturn(props);
             CreateLTPAKeysTask task = new CreateLTPAKeysTask(ltpaKeyFileUtil, fileUtil, TEST_UTILITY_NAME);
             String[] args = new String[] { "securityUtility", "--passwordEncoding=aes", "--passwordXmlFile=" + xmlFilePath,

@@ -80,11 +80,6 @@ public class AESKeyManager {
                 byte[] iv;
                 if (CryptoUtils.ENCRYPT_ALGORITHM_AES.equals(alg)) {
                     data = decodeBase64Key(keyChars);
-                    int keyBitLength = data.length * 8;
-                    if (keyBitLength != this.keyLength) {
-                        //TODO do we need an NLS message for this exception?
-                        throw new InvalidKeySpecException("Error: The provided key is not " + this.keyLength + " bits.");
-                    }
                 } else {
                     data = buildAesKeyWithPbkdf2(keyChars);
                 }
@@ -109,6 +104,11 @@ public class AESKeyManager {
             } catch (IllegalArgumentException iae) {
                 // TODO do we need an NLS message?
                 throw new InvalidKeySpecException("Key was not in base64 format", iae);
+            }
+            int keyBitLength = data.length * 8;
+            if (keyBitLength != this.keyLength) {
+                //TODO do we need an NLS message for this exception?
+                throw new InvalidKeySpecException("Error: The provided key is not " + this.keyLength + " bits.");
             }
             return data;
         }

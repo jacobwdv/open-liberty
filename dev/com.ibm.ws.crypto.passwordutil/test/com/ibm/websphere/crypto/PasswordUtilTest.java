@@ -40,6 +40,7 @@ import org.xml.sax.SAXException;
 import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.crypto.util.AESKeyManager;
 import com.ibm.ws.crypto.util.AESKeyManager.KeyVersion;
+import com.ibm.ws.crypto.util.EncryptionXmlParser;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
 
 import test.common.SharedOutputManager;
@@ -299,7 +300,7 @@ public class PasswordUtilTest {
             String invalidPath = "/non/existent/path/to/aeskey.xml";
 
             try {
-                PasswordUtil.parseAesEncryptionXmlFile(invalidPath);
+                EncryptionXmlParser.parseAesEncryptionXmlFile(invalidPath);
                 fail("Expected IOException for non-existent XML file path");
             } catch (Exception e) {
                 // We expect some kind of IOException or parsing failure
@@ -327,7 +328,7 @@ public class PasswordUtilTest {
             }
 
             try {
-                PasswordUtil.parseAesEncryptionXmlFile(badXml.getAbsolutePath());
+                EncryptionXmlParser.parseAesEncryptionXmlFile(badXml.getAbsolutePath());
                 fail("Expected SAXException or ParserConfigurationException for malformed XML content");
             } catch (Exception e) {
                 assertTrue(

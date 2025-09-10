@@ -24,6 +24,7 @@ import java.util.TreeSet;
 
 import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.ws.crypto.util.AESKeyManager;
+import com.ibm.ws.crypto.util.EncryptionXmlParser;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
 import com.ibm.ws.security.utility.SecurityUtilityTask;
 import com.ibm.ws.security.utility.utils.CommandUtils;
@@ -445,7 +446,7 @@ public abstract class BaseCommandTask implements SecurityUtilityTask {
      * @throws Exception
      */
     protected static void handleXmlArg(PrintStream stdout, HashMap<String, String> props, String value) throws Exception {
-        Map<String, String> aesEncodingProps = PasswordUtil.parseAesEncryptionXmlFile(value);
+        Map<String, String> aesEncodingProps = EncryptionXmlParser.parseAesEncryptionXmlFile(value);
         if (aesEncodingProps.containsKey(PasswordUtil.PROPERTY_CRYPTO_KEY) && aesEncodingProps.containsKey(PasswordUtil.PROPERTY_AES_KEY)) {
             stdout.println(getMessage("encode.xmlEncryptionAmbiguous", AESKeyManager.NAME_WLP_BASE64_AES_ENCRYPTION_KEY, AESKeyManager.NAME_WLP_PASSWORD_ENCRYPTION_KEY));
         }

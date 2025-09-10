@@ -773,9 +773,12 @@ public class PasswordCipherUtil {
     }
 
     private static byte[] getIvSourceBuffer(SecureRandom rand, Cipher c) {
-        byte[] ivSource = new byte[c.getBlockSize()];
-        rand.nextBytes(ivSource);
-        return ivSource;
+        //TODO bring to code review meeting
+//        byte[] ivSource = new byte[c.getBlockSize()];
+//        rand.nextBytes(ivSource);
+//        return ivSource;
+        return rand.generateSeed(c.getBlockSize());
+
     }
 
     private static byte[] aesDecipherV2(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
