@@ -19,6 +19,7 @@ import java.security.spec.KeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
@@ -32,6 +33,11 @@ import com.ibm.wsspi.security.crypto.KeyStringResolver;
  *
  */
 public class AESKeyManager {
+
+    private static final Class<?> CLASS_NAME = AESKeyManager.class;
+    private static final String RB = "com.ibm.ws.crypto.util.internal.resources.Messages";
+    private final static Logger logger = Logger.getLogger(CLASS_NAME.getCanonicalName(), RB);
+
     public static final String NAME_WLP_PASSWORD_ENCRYPTION_KEY = "wlp.password.encryption.key";
     public static final String NAME_WLP_BASE64_AES_ENCRYPTION_KEY = "wlp.aes.encryption.key";
     public static final String PROPERTY_WLP_PASSWORD_ENCRYPTION_KEY = "${" + NAME_WLP_PASSWORD_ENCRYPTION_KEY + "}";
@@ -79,7 +85,7 @@ public class AESKeyManager {
                 byte[] data;
                 byte[] iv;
                 if (CryptoUtils.ENCRYPT_ALGORITHM_AES.equals(alg)) {
-                    data = decodeBase64Key(keyChars);
+                    data = decodeAesBase64Key(keyChars);
                 } else {
                     data = buildAesKeyWithPbkdf2(keyChars);
                 }
@@ -97,18 +103,16 @@ public class AESKeyManager {
          * @return keyChars as a base64 decoded byte array.
          * @throws InvalidKeySpecException if keyChars does not represent a valid base64 value.
          */
-        private byte[] decodeBase64Key(char[] keyChars) throws InvalidKeySpecException {
+        private byte[] decodeAesBase64Key(char[] keyChars) throws InvalidKeySpecException {
             byte[] data;
             try {
                 data = Base64.getDecoder().decode(new String(keyChars));
             } catch (IllegalArgumentException iae) {
-                // TODO do we need an NLS message?
-                throw new InvalidKeySpecException("Key was not in base64 format", iae);
+                throw new InvalidKeySpecException(MessageUtils.getMessage("AESKEYMANAGER_NOT_BASE64_EXCEPTION"), iae);
             }
             int keyBitLength = data.length * 8;
             if (keyBitLength != this.keyLength) {
-                //TODO do we need an NLS message for this exception?
-                throw new InvalidKeySpecException("Error: The provided key is not " + this.keyLength + " bits.");
+                throw new InvalidKeySpecException(MessageUtils.getMessage("AESKEYMANAGER_INVALID_KEYLENGTH_EXCEPTION"));
             }
             return data;
         }

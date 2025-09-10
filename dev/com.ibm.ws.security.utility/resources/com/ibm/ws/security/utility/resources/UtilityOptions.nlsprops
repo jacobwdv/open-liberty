@@ -60,10 +60,10 @@ encode.desc=\
 \tFor more information, see the Open Liberty securityUtility encode documentation.
 #Note to translator the word "encode" should not be translated
 encode.usage.options=\
-\t{0} encode [options]
-encode.option-key.text=\
+\t{0} encode [options] textToEncode
+encode.option-key.1.text=\
 \ \ \ \ textToEncode
-encode.option-desc.text=\
+encode.option-desc.1.text=\
 \tIf no arguments are specified, the tool will enter the interactive\n\
 \tmode; otherwise, the provided text will be encoded.\n\
 \tText with spaces must be fully quoted if specified as an argument.

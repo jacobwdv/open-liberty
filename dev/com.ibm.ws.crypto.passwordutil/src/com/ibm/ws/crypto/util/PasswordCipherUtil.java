@@ -369,8 +369,12 @@ public class PasswordCipherUtil {
                 }
             }
             if (base64Key != null) {
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);
                 info = aesEncipherV2(decrypted_bytes, base64Key);
             } else {
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_CRYPTO_KEY);
                 info = aesEncipherV1(decrypted_bytes, cryptoKey);
             }
 
@@ -608,7 +612,7 @@ public class PasswordCipherUtil {
         try {
             Cipher c = Cipher.getInstance(CryptoUtils.AES_GCM_CIPHER);
             // 128 is the GCM tag length. 128 is the MAX.
-            GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, getIvSourceBuffer(rand, c));
+            GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, rand.generateSeed(c.getBlockSize()));
             c.init(Cipher.ENCRYPT_MODE, AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V1, cryptoKey), ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
             if (encrypted_bytes != null) {
@@ -714,20 +718,17 @@ public class PasswordCipherUtil {
         try {
             Cipher c = Cipher.getInstance(CryptoUtils.AES_GCM_CIPHER);
             // 128 is the GCM tag length. 128 is the MAX.
-            GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, getIvSourceBuffer(rand, c));
+            GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, rand.generateSeed(c.getBlockSize()));
             c.init(Cipher.ENCRYPT_MODE, AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V2, base64Key), ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
             if (encrypted_bytes != null) {
                 byte[] ivBytes = ps.getIV();
-                byte[] cipherBytes = CryptoUtils.AES_GCM_CIPHER.getBytes(StandardCharsets.UTF_8);
-                byte[] updatedBytes = new byte[ivBytes.length + cipherBytes.length + encrypted_bytes.length + 3];
+                byte[] updatedBytes = new byte[ivBytes.length + encrypted_bytes.length + 2];
                 updatedBytes[0] = 2; // indicates how we encoded so later on we can decode
                 updatedBytes[1] = (byte) ivBytes.length;
-                updatedBytes[2] = (byte) cipherBytes.length;
 
-                System.arraycopy(ivBytes, 0, updatedBytes, 3, ivBytes.length);
-                System.arraycopy(cipherBytes, 0, updatedBytes, ivBytes.length + 3, cipherBytes.length);
-                System.arraycopy(encrypted_bytes, 0, updatedBytes, ivBytes.length + cipherBytes.length + 3, encrypted_bytes.length);
+                System.arraycopy(ivBytes, 0, updatedBytes, 2, ivBytes.length);
+                System.arraycopy(encrypted_bytes, 0, updatedBytes, ivBytes.length + 2, encrypted_bytes.length);
                 info = new EncryptedInfo(updatedBytes, "");
             }
         } catch (NoSuchAlgorithmException e) {
@@ -744,6 +745,16 @@ public class PasswordCipherUtil {
             throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
         }
         return info;
+    }
+
+    private static byte[] aesDecipherV2(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
+
+        int ivLen = encrypted_bytes[1];
+        int cipherBytesStart = ivLen + 2;
+        GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 2, ivLen);
+        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, AESKeyManager.KeyVersion.AES_V2, iv, encrypted_bytes, cipherBytesStart,
+                                             encrypted_bytes.length - cipherBytesStart);
+        return removeSeed(decrypted);
     }
 
     /**
@@ -770,30 +781,6 @@ public class PasswordCipherUtil {
         System.arraycopy(seed, 0, preEncrypted, 1, seedSize);
         System.arraycopy(decrypted_bytes, 0, preEncrypted, seedSize + 1, decrypted_bytes.length);
         return preEncrypted;
-    }
-
-    private static byte[] getIvSourceBuffer(SecureRandom rand, Cipher c) {
-        //TODO bring to code review meeting
-//        byte[] ivSource = new byte[c.getBlockSize()];
-//        rand.nextBytes(ivSource);
-//        return ivSource;
-        return rand.generateSeed(c.getBlockSize());
-
-    }
-
-    private static byte[] aesDecipherV2(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
-
-        int ivLen = encrypted_bytes[1];
-        int transformationLen = encrypted_bytes[2];
-        int transformationStart = ivLen + 3;
-        int cipherBytesStart = ivLen + transformationLen + 3;
-        byte[] transformationBytes = new byte[transformationLen];
-        System.arraycopy(encrypted_bytes, transformationStart, transformationBytes, 0, transformationLen);
-        String transformation = new String(transformationBytes, StandardCharsets.UTF_8);
-        GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 3, ivLen);
-        byte[] decrypted = aesDecipherCommon(transformation, AESKeyManager.KeyVersion.AES_V2, iv, encrypted_bytes, cipherBytesStart,
-                                             encrypted_bytes.length - cipherBytesStart);
-        return removeSeed(decrypted);
     }
 
     private static byte[] removeSeed(byte[] decrypted) {

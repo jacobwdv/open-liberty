@@ -30,6 +30,7 @@ import com.ibm.ws.kernel.productinfo.ProductInfo;
 
 /**
  * A class for parsing xml and retrieving values for wlp.aes.encryption.key and wlp.password.encryption.key
+ * This is used by the command line tasks to parse xml in order to encode passwords.
  */
 public class EncryptionXmlParser {
     private static final String ATTR_VALUE = "value";
