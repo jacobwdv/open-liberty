@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -273,6 +273,13 @@ public class SAFEncryptionKey {
     }
 
     public String getKey() throws Exception {
+        byte[] keyBytes = getKeyBytes();
+
+        // Make it a string
+        return new String(keyBytes);
+    }
+
+    public byte[] getKeyBytes() throws Exception {
         Key key = null;
         PrivateKey privKey = null;
 
@@ -291,12 +298,7 @@ public class SAFEncryptionKey {
 
         //Pull the encoded bytes out of the private key object
         byte[] keyBytes = privKey.getEncoded();
-
-        // Make it a string
-        String keyString = new String(keyBytes);
-
-        return keyString;
-
+        return keyBytes;
     }
 
 }

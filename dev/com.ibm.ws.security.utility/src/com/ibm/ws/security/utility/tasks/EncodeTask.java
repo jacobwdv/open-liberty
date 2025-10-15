@@ -15,6 +15,7 @@ package com.ibm.ws.security.utility.tasks;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -183,7 +184,7 @@ public class EncodeTask extends BaseCommandTask {
     private Map<String, String> getKeyIfSAF(String encoding, Map<String, String> props) throws Exception {
 
         Map<String, String> p = props;
-        String cryptoKey = null;
+        byte[] cryptoKey = null;
 
         String keyring = props.get(PasswordUtil.PROPERTY_KEYRING);
         String type = props.get(PasswordUtil.PROPERTY_KEYRING_TYPE);
@@ -192,8 +193,12 @@ public class EncodeTask extends BaseCommandTask {
         if (encoding != null && encoding.trim().equalsIgnoreCase("aes")) {
             if ((keyring != null && !keyring.isEmpty()) && (type != null && !type.isEmpty()) && (label != null && !label.isEmpty())) {
                 SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
-                cryptoKey = ek.getKey();
-                p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, cryptoKey);
+                cryptoKey = ek.getKeyBytes();
+                if (cryptoKey.length == 32) {
+                    p.put(PasswordUtil.PROPERTY_AES_KEY, new String(Base64.getEncoder().encode(cryptoKey)));
+                } else {
+                    p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, new String(cryptoKey));
+                }
             }
         } else {
             //This is not aes, lets error if the keyring args are used
