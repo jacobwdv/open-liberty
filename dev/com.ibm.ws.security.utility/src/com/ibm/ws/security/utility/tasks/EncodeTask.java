@@ -195,7 +195,8 @@ public class EncodeTask extends BaseCommandTask {
                 SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
                 cryptoKey = ek.getKeyBytes();
                 if (cryptoKey.length == 32) {
-                    p.put(PasswordUtil.PROPERTY_AES_KEY, new String(Base64.getEncoder().encode(cryptoKey)));
+                    cryptoKey = Base64.getEncoder().encode(cryptoKey);
+                    p.put(PasswordUtil.PROPERTY_AES_KEY, new String(cryptoKey));
                 } else {
                     p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, new String(cryptoKey));
                 }
