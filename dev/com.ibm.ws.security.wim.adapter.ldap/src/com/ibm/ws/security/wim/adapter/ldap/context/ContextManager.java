@@ -4,7 +4,7 @@
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-2.0/
- * 
+ *
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
@@ -529,13 +529,20 @@ public class ContextManager {
              * Check if the credential is a protected string. It will be unprotected if this is an anonymous bind
              */
             Object o = env.get(Context.SECURITY_CREDENTIALS);
+            String password;
             if (o instanceof ProtectedString) {
                 // Reset the bindPassword to simple string.
                 ProtectedString sps = (ProtectedString) env.get(Context.SECURITY_CREDENTIALS);
-                String password = sps == null ? "" : new String(sps.getChars());
+                password = sps == null ? "" : new String(sps.getChars());
+                String decodedPassword = PasswordUtil.passwordDecode(password.trim());
+                env.put(Context.SECURITY_CREDENTIALS, decodedPassword);
+
+            } else if (o instanceof String) {
+                password = (String) env.get(Context.SECURITY_CREDENTIALS);
                 String decodedPassword = PasswordUtil.passwordDecode(password.trim());
                 env.put(Context.SECURITY_CREDENTIALS, decodedPassword);
             }
+
         }
 
         SSLUtilImpl sslUtil = new SSLUtilImpl();
@@ -1122,15 +1129,15 @@ public class ContextManager {
             iEnvironment.put(Context.SECURITY_PRINCIPAL, iBindDN);
             SerializableProtectedString sps = iBindPassword;
             String password = sps == null ? "" : new String(sps.getChars());
-            String decodedPassword = PasswordUtil.passwordDecode(password.trim());
-
-            /*
-             * A password is required if we had a bind DN.
-             */
-            if (decodedPassword == null || decodedPassword.length() == 0) {
+//            String decodedPassword = PasswordUtil.passwordDecode(password.trim());
+//
+//            /*
+//             * A password is required if we had a bind DN.
+//             */
+            if (password == null || password.length() == 0) {
                 return InitializeResult.MISSING_PASSWORD;
             }
-            iEnvironment.put(Context.SECURITY_CREDENTIALS, new ProtectedString(decodedPassword.toCharArray()));
+            iEnvironment.put(Context.SECURITY_CREDENTIALS, new ProtectedString(password.toCharArray()));
         }
 
         if (isKerberosBindAuth()) {
