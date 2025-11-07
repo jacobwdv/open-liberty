@@ -29,7 +29,7 @@ import com.ibm.ws.crypto.util.PasswordHashGenerator;
 import com.ibm.wsspi.security.crypto.EncryptedInfo;
 
 /**
- * Password related utilities.
+ * Password related utilities. testing key
  */
 public class PasswordUtil {
 
