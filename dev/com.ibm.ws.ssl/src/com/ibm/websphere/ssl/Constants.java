@@ -64,7 +64,9 @@ public class Constants {
     public static final String SSLPROP_CLIENT_AUTHENTICATION = "com.ibm.ssl.clientAuthentication";
     public static final String SSLPROP_CLIENT_AUTHENTICATION_SUPPORTED = "com.ibm.ssl.clientAuthenticationSupported";
     public static final String SSLPROP_CONTEXT_PROVIDER = "com.ibm.ssl.contextProvider";
+    // TODO remove SSLPROP_SECURITY_LEVEL after removing CL references.
     public static final String SSLPROP_SECURITY_LEVEL = "com.ibm.ssl.securityLevel";
+    // TODO remove SSLPROP_SECURITY_LEVEL after removing CL references.
     public static final String SSLPROP_TRUST_MANAGER = "com.ibm.ssl.trustManager";
     public static final String SSLPROP_CUSTOM_TRUST_MANAGERS = "com.ibm.ssl.customTrustManagers";
     public static final String SSLPROP_CUSTOM_KEY_MANAGER = "com.ibm.ssl.customKeyManager";
@@ -208,12 +210,6 @@ public class Constants {
     public static final String PROTOCOL_TLSV1_2 = "TLSv1.2";
     public static final String PROTOCOL_TLSV1_3 = "TLSv1.3";
     public static final String PROTOCOL_TLS_FIPS = PROTOCOL_TLSV1_2 + ", " + PROTOCOL_TLSV1_3;
-
-    /*** SECURITY LEVEL CONSTANTS ***/
-    public static final String SECURITY_LEVEL_HIGH = "HIGH";
-    public static final String SECURITY_LEVEL_MEDIUM = "MEDIUM";
-    public static final String SECURITY_LEVEL_LOW = "LOW";
-    public static final String SECURITY_LEVEL_CUSTOM = "CUSTOM";
 
     /*** PROVIDER CONSTANTS ***/
     public static final String IBMJCE = "com.ibm.crypto.provider.IBMJCE";
