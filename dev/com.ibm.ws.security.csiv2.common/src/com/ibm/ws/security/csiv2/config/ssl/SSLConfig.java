@@ -126,7 +126,8 @@ public class SSLConfig {
     }
 
     /**
-     * This method will warn if any requested cipher suites appear to not match the options
+     * This method will warn if any requested cipher suites are present in candidateCipherSuites
+     * and appear to not match the options
      *
      * @param candidateCipherSuites locally supported cipher suites
      * @param requested             cipher suites explicitly configured
@@ -139,9 +140,9 @@ public class SSLConfig {
         EnumSet<Options> requires = toOptions(options.requires, false);
         List<String> result = new ArrayList<String>(requested.length);
         for (String choice : requested) {
-            //Issue a warning/debug message only
-            matches(supports, requires, choice);
             if (candidates.contains(choice)) {
+                //Issue a warning/debug message before adding to the result list
+                matches(supports, requires, choice);
                 result.add(choice);
             }
         }
