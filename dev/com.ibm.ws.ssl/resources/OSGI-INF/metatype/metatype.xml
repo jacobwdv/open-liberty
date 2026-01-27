@@ -134,7 +134,10 @@
             
         <AD id="enforceCipherOrder" name="%repertoire.enforceCipherOrder" description="%repertoire.enforceCipherOrder.desc" 
             required="false" type="Boolean" default="false" />
-                                 
+            
+        <AD id="cipherSuiteModifiers" name="%repertoire.cipherSuiteModifiers" description="%repertoire.cipherSuiteModifiers.desc" 
+            required="false" type="String" />
+                        
     </OCD>
 
     <Designate factoryPid="com.ibm.ws.ssl.repertoire">

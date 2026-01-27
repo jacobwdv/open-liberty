@@ -226,6 +226,7 @@ public abstract class AbstractJSSEProvider implements JSSEProvider {
             supportedCiphers = factory.getSupportedCipherSuites();
         }
 
+        // TODO see if this method can be removed. It looks like it is unused.
         return Constants.adjustSupportedCiphersToSecurityLevel(supportedCiphers, securityLevel);
     }
 

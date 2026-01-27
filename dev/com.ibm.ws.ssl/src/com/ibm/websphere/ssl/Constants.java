@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.ibm.websphere.ras.Tr;
 import com.ibm.websphere.ras.TraceComponent;
@@ -75,6 +77,7 @@ public class Constants {
     public static final String SSLPROP_SKIP_HOSTNAME_VERIFICATION_FOR_HOSTS = "com.ibm.ws.ssl.skipHostnameVerificationForHosts";
     public static final String SSLPROP_USE_DEFAULTCERTS = "com.ibm.ws.ssl.trustDefaultCerts";
     public static final String SSLPROP_ENFORCE_CIPHER_ORDER = "com.ibm.ws.ssl.enforceCipherOrder";
+    public static final String SSLPROP_ENFORCE_CIPHER_MODIFIERS = "com.ibm.ws.ssl.cipherSuiteModifiers";
 
     public static final String SSLPROP_AUTOACCEPT_SERVER_CERT = "com.ibm.ssl.autoaccept.server.certificates";
     public static final String SSLPROP_AUTOSTORE_SERVER_CERT = "com.ibm.ssl.autostore.server.certificates";
@@ -298,7 +301,7 @@ public class Constants {
 
     // FIPS 140-3: Algorithm assessment complete; no changes required.
     // These constants are unused with FIPS enabled, but cannot update them as they would break the backward compatibility.
-   /** SSL V2 cipher specifications */
+    /** SSL V2 cipher specifications */
     public static final String SSL_CK_RC4_128_WITH_MD5 = "SSL_CK_RC4_128_WITH_MD5",
                     SSL_CK_RC4_128_EXPORT40_WITH_MD5 = "SSL_CK_RC4_128_EXPORT40_WITH_MD5",
                     SSL_CK_RC2_128_CBC_WITH_MD5 = "SSL_CK_RC2_128_CBC_WITH_MD5",
@@ -432,6 +435,38 @@ public class Constants {
     }
 
     /**
+     * This method adjusts the supported ciphers to add or remove ciphers to the list
+     * by filtering it with the 'modifiers' string.
+     *
+     * @param supportedCiphers
+     * @param modifiers
+     * @return String[]
+     */
+    public static String[] adjustSupportedCiphers(String[] supportedCiphers, String modifiers) {
+        if (TraceComponent.isAnyTracingEnabled() && tc.isEntryEnabled()) {
+            Tr.entry(tc, "adjustSupportedCiphers", new Object[] { convertCipherListToString(supportedCiphers), modifiers });
+        }
+
+        String[] adjustedCiphers;
+        if (modifiers != null && !modifiers.isEmpty()) {
+            String[] mods = modifiers.split(" ");
+            List<String> addCiphers = Arrays.stream(mods).filter(cipher -> cipher.startsWith("+")).map(cipher -> cipher.substring(1)).collect(Collectors.toList());
+            List<String> removeCiphers = Arrays.stream(mods).filter(cipher -> cipher.startsWith("-")).map(cipher -> cipher.substring(1)).collect(Collectors.toList());
+            List<String> newCipherList = Arrays.stream(supportedCiphers).filter(cipher -> !removeCiphers.contains(cipher)).collect(Collectors.toList());
+            newCipherList = Stream.concat(newCipherList.stream(), addCiphers.stream()).collect(Collectors.toList());
+            adjustedCiphers = newCipherList.toArray(new String[newCipherList.size()]);
+        } else {
+            adjustedCiphers = supportedCiphers.clone();
+        }
+
+        if (TraceComponent.isAnyTracingEnabled() && tc.isEntryEnabled()) {
+            Tr.exit(tc, "adjustSupportedCiphers -> "
+                        + convertCipherListToString(adjustedCiphers));
+        }
+        return adjustedCiphers;
+    }
+
+    /**
      * This method converts the cipher suite String[] to a space-delimited String.
      *
      * @param cipherList
@@ -458,7 +493,6 @@ public class Constants {
                                                                                         PROTOCOL_TLSV1_2,
                                                                                         PROTOCOL_TLSV1_3
     });
-
 
     public static final List<String> FIPS_140_2_PROTOCOLS = Arrays.asList(new String[] {
                                                                                          PROTOCOL_TLSV1,

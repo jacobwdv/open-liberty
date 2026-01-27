@@ -617,6 +617,11 @@ public class SSLConfigManager {
             sslprops.setProperty(Constants.SSLPROP_ENFORCE_CIPHER_ORDER, enforceCipherOrder.toString());
         }
 
+        String cipherSuiteModifiers = (String) map.get("cipherSuiteModifiers");
+        if (null != cipherSuiteModifiers) {
+            sslprops.setProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS, cipherSuiteModifiers);
+        }
+
         if (TraceComponent.isAnyTracingEnabled() && tc.isDebugEnabled())
             Tr.debug(tc, "Saving SSLConfig: " + sslprops);
 
@@ -1108,15 +1113,15 @@ public class SSLConfigManager {
     }
 
     /***
-     * This method adjusts the supported ciphers to include those appropriate to
-     * the security level (HIGH, MEDIUM, LOW).
+     * This method adjusts the supported ciphers to add or remove ciphers to the list
+     * by filtering it with the 'cipherModifiers' string.
      *
      * @param supportedCiphers
-     * @param securityLevel
+     * @param cipherModifiers
      * @return String[]
      ***/
-    public synchronized String[] adjustSupportedCiphersToSecurityLevel(String[] supportedCiphers, String securityLevel) {
-        return (Constants.adjustSupportedCiphersToSecurityLevel(supportedCiphers, securityLevel));
+    public synchronized String[] adjustSupportedCiphers(String[] supportedCiphers, String cipherModifiers) {
+        return (Constants.adjustSupportedCiphers(supportedCiphers, cipherModifiers));
     }
 
     /***
@@ -1464,13 +1469,10 @@ public class SSLConfigManager {
             if (cipherString != null) {
                 ciphers = cipherString.split("\\s+");
             } else {
-                String securityLevel = props.getProperty(Constants.SSLPROP_SECURITY_LEVEL);
+                String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
                 if (tc.isDebugEnabled())
-                    Tr.debug(tc, "securityLevel from properties is " + securityLevel);
-                if (securityLevel == null)
-                    securityLevel = "HIGH";
-
-                ciphers = adjustSupportedCiphersToSecurityLevel(socket.getSupportedCipherSuites(), securityLevel);
+                    Tr.debug(tc, "cipherSuiteModifiers from properties is " + cipherModifiers);
+                ciphers = adjustSupportedCiphers(socket.getSupportedCipherSuites(), cipherModifiers);
 
             }
         } catch (Exception e) {
@@ -1501,14 +1503,11 @@ public class SSLConfigManager {
             if (cipherString != null) {
                 ciphers = cipherString.split("\\s+");
             } else {
-                String securityLevel = props.getProperty(Constants.SSLPROP_SECURITY_LEVEL);
+                String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
                 if (tc.isDebugEnabled())
-                    Tr.debug(tc, "securityLevel from properties is " + securityLevel);
-                if (securityLevel == null)
-                    securityLevel = "HIGH";
+                    Tr.debug(tc, "cipherSuiteModifiers from properties is " + cipherModifiers);
 
-                ciphers = adjustSupportedCiphersToSecurityLevel(socket.getSupportedCipherSuites(), securityLevel);
-
+                ciphers = adjustSupportedCiphers(socket.getSupportedCipherSuites(), cipherModifiers);
             }
         } catch (Exception e) {
             if (tc.isDebugEnabled())
