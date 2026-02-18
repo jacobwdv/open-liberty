@@ -113,9 +113,9 @@ public class LibertySSLEngineWrapper extends SSLEngine {
 
     @Override
     public String[] getSupportedCipherSuites() {
-        String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
+        String cipherModifiers = props.getProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
         if (tc.isDebugEnabled())
-            Tr.debug(tc, "cipherSuiteModifiers from properties is " + cipherModifiers);
+            Tr.debug(tc, "jdkCipherOverrides from properties is " + cipherModifiers);
         return Constants.adjustSupportedCiphersToSecurityLevel(delegate.getSupportedCipherSuites(), cipherModifiers);
     }
 

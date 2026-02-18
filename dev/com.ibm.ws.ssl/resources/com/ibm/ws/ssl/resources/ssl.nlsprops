@@ -691,3 +691,9 @@ ssl.config.error.CWPKI0835E.useraction=Ensure that the SSL configuration attribu
 ssl.config.error.CWPKI0836E=CWPKI0836E: An SSL/TLS configuration cannot created because key and trust managers were not created.
 ssl.config.error.CWPKI0836E.explanation=An error in the configuration prevented the key and trust managers from being created.
 ssl.config.error.CWPKI0836E.useraction=Ensure that the SSL configuration attributes are correct. Review the logs for errors that are associated with SSL configuration attributes.
+# -------------------------------------------------------------------------------------------------
+ssl.securitylevel.ignored.CWPKI0837I=CWPKI0837I: The securityLevel attribute is set but will be ignored.
+ssl.securitylevel.ignored.CWPKI0837I.explanation=The specified value for securityLevel will be ignored because this attribute is no longer used. JDK default cipher suites will be used and can be overridden by the enabledCiphers attribute and filtered by the jdkCipherOverrides attribute. 
+ssl.securitylevel.ignored.CWPKI0837I.useraction=Remove ssl configuration attribute securityLevel from the server configuration.
+# -------------------------------------------------------------------------------------------------
+

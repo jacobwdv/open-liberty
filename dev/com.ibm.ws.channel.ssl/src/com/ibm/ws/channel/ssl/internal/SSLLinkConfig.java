@@ -89,7 +89,7 @@ public class SSLLinkConfig {
         Object ciphersObject = this.myConfig.get(Constants.SSLPROP_ENABLED_CIPHERS);
         if (null == ciphersObject) {
             // Did not find the enabled ciphers. Need to determine them here.
-            String cipherModifiers = this.myConfig.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
+            String cipherModifiers = this.myConfig.getProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
             ciphers = Constants.adjustSupportedCiphers(sslEngine.getSupportedCipherSuites(), cipherModifiers);
         } else {
             // Found enabled cipher suites. Now we need to put them in the right kind of object.

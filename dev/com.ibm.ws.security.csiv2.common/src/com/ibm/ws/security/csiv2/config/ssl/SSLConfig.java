@@ -94,7 +94,7 @@ public class SSLConfig {
             OptionsKey options = getAssociationOptions(sslAliasName, props);
             return filter(candidateCipherSuites, requested, options);
         } else {
-            String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
+            String cipherModifiers = props.getProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
             return Constants.adjustSupportedCiphers(candidateCipherSuites, cipherModifiers);
         }
     }
@@ -183,12 +183,7 @@ public class SSLConfig {
         short clientAuthRequired = (isClientAuthRequired) ? EstablishTrustInClient.value : 0;
         String clientAuthSupportedString = props.getProperty(Constants.SSLPROP_CLIENT_AUTHENTICATION_SUPPORTED);
         short clientAuthSupported = ("true".equalsIgnoreCase(clientAuthSupportedString) || isClientAuthRequired) ? EstablishTrustInClient.value : 0;
-        String securityLevelString = props.getProperty(Constants.SSLPROP_SECURITY_LEVEL);
-        if (Constants.SECURITY_LEVEL_LOW.equals(securityLevelString)) {
-            return new OptionsKey((short) (Integrity.value | EstablishTrustInTarget.value | clientAuthSupported), (short) (Integrity.value | clientAuthRequired));
-        }
-        //other choices are null (default to HIGH), HIGH, MEDIUM, and CUSTOM which we will treat as HIGH
-        //n.b. MEDIUM and HIGH only differ in cipher strength, not association options.
+
         return new OptionsKey((short) (Integrity.value | Confidentiality.value | EstablishTrustInTarget.value
                                        | clientAuthSupported), (short) (Integrity.value | Confidentiality.value | clientAuthRequired));
     }

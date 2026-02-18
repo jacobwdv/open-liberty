@@ -77,7 +77,7 @@ public class Constants {
     public static final String SSLPROP_SKIP_HOSTNAME_VERIFICATION_FOR_HOSTS = "com.ibm.ws.ssl.skipHostnameVerificationForHosts";
     public static final String SSLPROP_USE_DEFAULTCERTS = "com.ibm.ws.ssl.trustDefaultCerts";
     public static final String SSLPROP_ENFORCE_CIPHER_ORDER = "com.ibm.ws.ssl.enforceCipherOrder";
-    public static final String SSLPROP_ENFORCE_CIPHER_MODIFIERS = "com.ibm.ws.ssl.cipherSuiteModifiers";
+    public static final String SSLPROP_JDK_CIPHER_OVERRIDES = "com.ibm.ws.ssl.jdkCipherOverrides";
 
     public static final String SSLPROP_AUTOACCEPT_SERVER_CERT = "com.ibm.ssl.autoaccept.server.certificates";
     public static final String SSLPROP_AUTOSTORE_SERVER_CERT = "com.ibm.ssl.autostore.server.certificates";

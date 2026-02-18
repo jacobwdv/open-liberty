@@ -113,6 +113,7 @@ public class SSLConfigManager {
 
     // Collective controller and member serverIdentity
     private static final String SERVER_IDENTITY = "serverIdentity";
+    private static boolean isSecurityLevelWarningLogged = false;
 
     /**
      * Private constructor, use getInstance().
@@ -412,8 +413,9 @@ public class SSLConfigManager {
             sslprops.setProperty(Constants.SSLPROP_CLIENT_AUTHENTICATION_SUPPORTED, clientAuthenticationSupported);
 
         String securityLevel = getSystemProperty(Constants.SSLPROP_SECURITY_LEVEL);
-        if (securityLevel != null && !securityLevel.equals(""))
-            sslprops.setProperty(Constants.SSLPROP_SECURITY_LEVEL, securityLevel);
+        if (securityLevel != null && !securityLevel.equals("")) {
+            logSecurityLevelWarning();
+        }
 
         String clientKeyAlias = getSystemProperty(Constants.SSLPROP_KEY_STORE_CLIENT_ALIAS);
         if (clientKeyAlias != null && !clientKeyAlias.equals(""))
@@ -436,12 +438,27 @@ public class SSLConfigManager {
             sslprops.setProperty(Constants.SSLPROP_ENABLED_CIPHERS, enabledCiphers);
         }
 
+        String cipherSuiteOverrides = getSystemProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
+        if (null != cipherSuiteOverrides && !cipherSuiteOverrides.isEmpty()) {
+            sslprops.setProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES, cipherSuiteOverrides);
+        }
+
         if (TraceComponent.isAnyTracingEnabled() && tc.isDebugEnabled())
             Tr.debug(tc, "Saving SSLConfig." + sslprops.toString());
 
         if (TraceComponent.isAnyTracingEnabled() && tc.isEntryEnabled())
             Tr.exit(tc, "parseDefaultSecureSocketLayer");
         return sslprops;
+    }
+
+    /**
+     * Log CWPKI0837I once to inform users it is no longer used.
+     */
+    private static void logSecurityLevelWarning() {
+        if (!isSecurityLevelWarningLogged) {
+            Tr.info(tc, "ssl.securitylevel.ignored.CWPKI0837I");
+            isSecurityLevelWarningLogged = true;
+        }
     }
 
     /**
@@ -548,7 +565,7 @@ public class SSLConfigManager {
 
         String prop = (String) map.get("securityLevel");
         if (null != prop && !prop.isEmpty()) {
-            sslprops.setProperty(Constants.SSLPROP_SECURITY_LEVEL, prop);
+            logSecurityLevelWarning();
         }
 
         prop = (String) map.get("clientKeyAlias");
@@ -617,9 +634,9 @@ public class SSLConfigManager {
             sslprops.setProperty(Constants.SSLPROP_ENFORCE_CIPHER_ORDER, enforceCipherOrder.toString());
         }
 
-        String cipherSuiteModifiers = (String) map.get("cipherSuiteModifiers");
-        if (null != cipherSuiteModifiers) {
-            sslprops.setProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS, cipherSuiteModifiers);
+        String cipherSuiteOverrides = (String) map.get("jdkCipherOverrides");
+        if (null != cipherSuiteOverrides) {
+            sslprops.setProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES, cipherSuiteOverrides);
         }
 
         if (TraceComponent.isAnyTracingEnabled() && tc.isDebugEnabled())
@@ -1469,9 +1486,9 @@ public class SSLConfigManager {
             if (cipherString != null) {
                 ciphers = cipherString.split("\\s+");
             } else {
-                String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
+                String cipherModifiers = props.getProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
                 if (tc.isDebugEnabled())
-                    Tr.debug(tc, "cipherSuiteModifiers from properties is " + cipherModifiers);
+                    Tr.debug(tc, "jdkCipherOverrides from properties is " + cipherModifiers);
                 ciphers = adjustSupportedCiphers(socket.getSupportedCipherSuites(), cipherModifiers);
 
             }
@@ -1503,9 +1520,9 @@ public class SSLConfigManager {
             if (cipherString != null) {
                 ciphers = cipherString.split("\\s+");
             } else {
-                String cipherModifiers = props.getProperty(Constants.SSLPROP_ENFORCE_CIPHER_MODIFIERS);
+                String cipherModifiers = props.getProperty(Constants.SSLPROP_JDK_CIPHER_OVERRIDES);
                 if (tc.isDebugEnabled())
-                    Tr.debug(tc, "cipherSuiteModifiers from properties is " + cipherModifiers);
+                    Tr.debug(tc, "jdkCipherOverrides from properties is " + cipherModifiers);
 
                 ciphers = adjustSupportedCiphers(socket.getSupportedCipherSuites(), cipherModifiers);
             }
