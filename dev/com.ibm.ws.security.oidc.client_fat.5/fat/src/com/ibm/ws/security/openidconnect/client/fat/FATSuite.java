@@ -20,9 +20,9 @@ import org.junit.runners.Suite.SuiteClasses;
 
 import com.ibm.ws.security.fat.common.actions.LargeProjectRepeatActions;
 import com.ibm.ws.security.fat.common.utils.ldaputils.CommonLocalLDAPServerSuite;
-import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcClientCookieNameTests;
-import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcClientLTPACookieTests;
-import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcClientSameSiteTests;
+import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcClientConsumeUserinfoTests;
+import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcPropagationConsumeUserinfoTests;
+import com.ibm.ws.security.openidconnect.client.fat.IBM.OidcPropagationRemoteValidationTests;
 
 import componenttest.custom.junit.runner.AlwaysPassesTest;
 import componenttest.rules.repeater.RepeatTests;
@@ -30,9 +30,9 @@ import componenttest.rules.repeater.RepeatTests;
 @RunWith(Suite.class)
 @SuiteClasses({
         AlwaysPassesTest.class,
-        OidcClientCookieNameTests.class,
-        OidcClientLTPACookieTests.class,
-        OidcClientSameSiteTests.class
+        OidcClientConsumeUserinfoTests.class,
+        OidcPropagationConsumeUserinfoTests.class,
+        OidcPropagationRemoteValidationTests.class
 })
 /**
  * Purpose: This suite collects and runs all known good test suites.
