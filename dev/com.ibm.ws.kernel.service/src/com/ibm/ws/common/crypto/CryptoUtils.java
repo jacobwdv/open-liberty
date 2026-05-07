@@ -25,6 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+
 import com.ibm.websphere.ras.Tr;
 import com.ibm.websphere.ras.TraceComponent;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
@@ -88,6 +91,8 @@ public class CryptoUtils {
     public static final String IBMJCE_PLUS_FIPS_NAME = "IBMJCEPlusFIPS";
     public static final String OPENJCE_PLUS_NAME = "OpenJCEPlus";
     public static final String OPENJCE_PLUS_FIPS_NAME = "OpenJCEPlusFIPS";
+
+    public static final String KEYSTORE_TYPE_JCECCAKS = "JCECCAKS";
 
     public static final String USE_FIPS_PROVIDER = "com.ibm.jsse2.usefipsprovider";
     public static final String USE_FIPS_PROVIDER_NAME = "com.ibm.jsse2.usefipsProviderName";
@@ -652,5 +657,37 @@ public class CryptoUtils {
        -93, 86, 76, -115, 113, -124, 104, -40, -121, -9, 86, 121, -48, -57, -77, -58, 73, 7, 12, 4, 24, -81, -64, 107 };
 
     public static final int GCM_TAG_LENGTH = 128;
+
+    /**
+     * Retrieves an AES key from CCA using the key label.
+     * Uses reflection to avoid compile-time dependency on KeyLabelKeySpec.
+     *
+     * @param keyLabel The label of the key in CCA
+     * @return The SecretKey retrieved from CCA, or null if retrieval fails
+     */
+    public static SecretKey getKeyFromCCA(String keyLabel) {
+        try {
+            SecretKeyFactory aesKeyFactory = SecretKeyFactory.getInstance("AES", IBMJCECCA_NAME);
+            
+            // Create KeyLabelKeySpec using reflection to avoid compile-time dependency
+            // KeyLabelKeySpec is only available on z/OS with IBMJCECCA provider
+            Class<?> keyLabelKeySpecClass = Class.forName("com.ibm.crypto.hdwrCCA.provider.KeyLabelKeySpec");
+            Object spec = keyLabelKeySpecClass.getConstructor(String.class).newInstance(keyLabel);
+            
+            if (TraceComponent.isAnyTracingEnabled() && tc.isDebugEnabled()) {
+                Tr.debug(tc, "Retrieving AES key from CCA with label: " + keyLabel);
+            }
+            
+            // Generate the secret key from the key label
+            return aesKeyFactory.generateSecret((java.security.spec.KeySpec) spec);
+        } catch (Exception e) {
+            // Provider not available, class not found, key label doesn't exist, or other error
+            Tr.error(tc, "CCA key retrieval failed for label '" + keyLabel + "': " + e.getMessage());
+            if (TraceComponent.isAnyTracingEnabled() && tc.isDebugEnabled()) {
+                Tr.debug(tc, "Failed to retrieve key from CCA", e);
+            }
+            return null;
+        }
+    }
 
 }

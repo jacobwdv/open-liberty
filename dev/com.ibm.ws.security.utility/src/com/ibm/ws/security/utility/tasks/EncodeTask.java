@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -23,12 +24,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+
 import com.ibm.json.java.JSON;
 import com.ibm.json.java.JSONArray;
 import com.ibm.json.java.JSONObject;
 import com.ibm.websphere.crypto.InvalidPasswordEncodingException;
 import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.websphere.crypto.UnsupportedCryptoAlgorithmException;
+import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.crypto.util.PasswordCipherUtil;
 import com.ibm.ws.crypto.util.UnsupportedConfigurationException;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
@@ -209,9 +214,21 @@ public class EncodeTask extends BaseCommandTask {
 
         if (encoding != null && encoding.trim().equalsIgnoreCase("aes")) {
             if ((keyring != null && !keyring.isEmpty()) && (type != null && !type.isEmpty()) && (label != null && !label.isEmpty())) {
-                SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
-                cryptoKey = ek.getKey();
-                p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, cryptoKey);
+                if (type.equals(CryptoUtils.KEYSTORE_TYPE_JCECCAKS)) {
+                    // CCA keystore type - retrieve key from CCA
+                    SecretKey secretKey = CryptoUtils.getKeyFromCCA(label);
+                    if (secretKey != null) {
+                        String base64Key = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+                        p.put(PasswordUtil.PROPERTY_AES_KEY, base64Key);
+                    } else {
+                        throw new IllegalArgumentException("Failed to retrieve key from CCA with label: " + label);
+                    }
+                } else {
+                    // SAF keyring type
+                    SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
+                    cryptoKey = ek.getKey();
+                    p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, cryptoKey);
+                }
             }
         } else {
             //This is not aes, lets error if the keyring args are used
