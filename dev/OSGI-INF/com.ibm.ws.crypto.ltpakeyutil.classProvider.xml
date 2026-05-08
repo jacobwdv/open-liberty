@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="com.ibm.ws.crypto.ltpakeyutil.classProvider">
+  <property name="service.vendor" type="String" value="IBM"/>
+  <property name="classes" type="String">com.ibm.ws.crypto.ltpakeyutil.LTPAPrivateKey
+com.ibm.ws.crypto.ltpakeyutil.LTPAPublicKey</property>
+  <service>
+    <provide interface="com.ibm.ws.serialization.DeserializationClassProvider"/>
+  </service>
+  <implementation class="com.ibm.ws.serialization.DeserializationClassProvider"/>
+</component>

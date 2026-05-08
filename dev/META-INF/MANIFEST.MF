@@ -1,0 +1,39 @@
+Manifest-Version: 1.0
+Build-Identifier: SNAPSHOT-Fri May 08 00:21:26 UTC 2026
+Bundle-Copyright: Copyright (c) 1999, 2026 IBM Corporation and others.
+  All rights reserved. This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License 2.0 whi
+ ch accompanies this distribution, and is available at http://www.ecli
+ pse.org/legal/epl-2.0/.
+Bundle-Description: LTPA Key Crypto Utilities; version=1.0
+Bundle-Developers: contbld; name=contbld; email=contbld@uk.ibm.com; or
+ ganization=IBM; organizationUrl=https://openliberty.io
+Bundle-DocURL: https://openliberty.io
+Bundle-License: Eclipse Public License; url=https://www.eclipse.org/le
+ gal/epl-2.0/
+Bundle-ManifestVersion: 2
+Bundle-Name: LTPA Key Crypto Utilities
+Bundle-SCM: connection=scm:git:https://github.com/OpenLiberty/open-lib
+ erty.git, developerConnection=scm:git:https://github.com:OpenLiberty/
+ open-liberty.git, url=https://github.com/OpenLiberty/open-liberty/tre
+ e/release
+Bundle-SymbolicName: com.ibm.ws.crypto.ltpakeyutil
+Bundle-Vendor: IBM
+Bundle-Version: 1.0.113.202605072020
+Created-By: 17.0.18 (IBM Corporation)
+Export-Package: com.ibm.ws.crypto.ltpakeyutil;version="1.0.16";uses:="
+ com.ibm.wsspi.security.crypto"
+Import-Package: com.ibm.websphere.ras;version="[1.2,2)",com.ibm.websph
+ ere.ras.annotation;version="[1.0,2)",com.ibm.ws.common.crypto;version
+ ="[1.0,2)",com.ibm.ws.common.encoder;version="[1.0,2)",com.ibm.ws.cry
+ pto.ltpakeyutil;version="[1.0,1.1)",com.ibm.ws.serialization,com.ibm.
+ wsspi.security.crypto;version="[1.2,2)",javax.crypto,javax.crypto.spe
+ c
+Require-Capability: osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.8))"
+ ,osgi.extender;filter:="(&(osgi.extender=osgi.component)(version>=1.4
+ .0)(!(version>=2.0.0)))"
+Service-Component: OSGI-INF/com.ibm.ws.crypto.ltpakeyutil.classProvide
+ r.xml,OSGI-INF/com.ibm.ws.crypto.ltpakeyutil.CKDSKeyEncryptorProvider
+ Component.xml
+Tool: Bnd-7.0.0.202310060912
+

@@ -1,0 +1,33 @@
+###############################################################################
+# Copyright (c) 2025 IBM Corporation and others.
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Eclipse Public License 2.0
+# which accompanies this distribution, and is available at
+# http://www.eclipse.org/legal/epl-2.0/
+# 
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#     IBM Corporation - initial API and implementation
+###############################################################################
+#CMVCPATHNAME com.ibm.ws.crypto.ltpakeyutil/resources/com/ibm/ws/crypto/ltpakeyutil/internal/resources/LTPAKeyUtilMessages.nlsprops
+#COMPONENTPREFIX CWWKS
+#COMPONENTNAMEFOR WebSphere Application Server LTPA Key Utilities
+#ISMESSAGEFILE TRUE
+#NLS_MESSAGEFORMAT_VAR
+#NLS_ENCODING=UNICODE
+# -------------------------------------------------------------------------------------------------
+
+# Message prefix block: CWWKS4300 - CWWKS4319
+
+CKDS_PROVIDER_ACTIVATED=CWWKS4300I: CKDS KeyEncryptorProvider activated successfully. LTPA keys will be encrypted using z/OS CKDS hardware crypto.
+CKDS_PROVIDER_ACTIVATED.explanation=The CKDS key encryptor provider has been successfully activated and will be used for encrypting and decrypting LTPA keys using z/OS CKDS with IBMJCECCA hardware crypto.
+CKDS_PROVIDER_ACTIVATED.useraction=No action is required.
+
+CKDS_PROVIDER_ACTIVATION_FAILED=CWWKS4301W: Failed to activate CKDS KeyEncryptorProvider, using default provider: {0}
+CKDS_PROVIDER_ACTIVATION_FAILED.explanation=The CKDS key encryptor provider failed to initialize. This is expected on non-z/OS platforms or when CKDS is not configured. The default password-based key encryptor will be used instead.
+CKDS_PROVIDER_ACTIVATION_FAILED.useraction=If you are on z/OS and expect CKDS to be available, verify that CKDS is properly configured and the IBMJCECCA provider is available. Otherwise, no action is required.
+
+CKDS_PROVIDER_DEACTIVATED=CWWKS4302I: CKDS KeyEncryptorProvider deactivated, reverted to default provider.
+CKDS_PROVIDER_DEACTIVATED.explanation=The CKDS key encryptor provider has been deactivated. The system has reverted to using the default password-based key encryptor.
+CKDS_PROVIDER_DEACTIVATED.useraction=No action is required.

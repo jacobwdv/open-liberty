@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>dev</groupId>
+  <artifactId>com.ibm.ws.crypto.ltpakeyutil</artifactId>
+  <version>1.0.113.202605072020</version>
+  <name>LTPA Key Crypto Utilities</name>
+  <description>LTPA Key Crypto Utilities; version=1.0</description>
+  <url>https://openliberty.io</url>
+  <organization>
+    <name>IBM</name>
+  </organization>
+  <licenses>
+    <license>
+      <name>Eclipse Public License</name>
+      <url>https://www.eclipse.org/legal/epl-2.0/</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>contbld</id>
+      <name>contbld</name>
+      <email>contbld@uk.ibm.com</email>
+      <organization>IBM</organization>
+      <organizationUrl>https://openliberty.io</organizationUrl>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/OpenLiberty/open-liberty.git</connection>
+    <developerConnection>scm:git:https://github.com:OpenLiberty/open-liberty.git</developerConnection>
+    <url>https://github.com/OpenLiberty/open-liberty/tree/release</url>
+  </scm>
+</project>
