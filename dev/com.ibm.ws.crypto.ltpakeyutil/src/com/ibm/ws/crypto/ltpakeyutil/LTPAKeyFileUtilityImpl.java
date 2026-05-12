@@ -23,6 +23,7 @@ import java.util.Properties;
 
 import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.common.encoder.Base64Coder;
+import com.ibm.wsspi.security.crypto.KeyEncryptor;
 
 /**
  * 
@@ -70,7 +71,7 @@ public class LTPAKeyFileUtilityImpl implements LTPAKeyFileUtility {
         Properties expProps = null;
 
         try {
-            KeyEncryptor encryptor = new KeyEncryptor(keyPasswordBytes);
+            KeyEncryptor encryptor = LTPAKeyEncryptorManager.getKeyEncryptor(keyPasswordBytes);
 
             if (publicKeyBytes == null && privateKeyBytes == null) {
                 LTPAKeyPair pair = LTPADigSignature.generateLTPAKeyPair();

@@ -15,12 +15,13 @@ package com.ibm.ws.crypto.ltpakeyutil;
 import java.security.MessageDigest;
 
 import com.ibm.ws.common.crypto.CryptoUtils;
+import com.ibm.wsspi.security.crypto.KeyEncryptor;
 
 /**
- * A package local class for performing encryption and decryption of keys based
+ * A default implementation for performing encryption and decryption of keys based
  * on admin's password
  */
-public class KeyEncryptor {
+public class DefaultKeyEncryptor implements KeyEncryptor {
 
 	private static final boolean fipsEnabled = CryptoUtils.isFips140_3Enabled();
 	private static final int size = (fipsEnabled ? 32 : 24);
@@ -28,11 +29,11 @@ public class KeyEncryptor {
 	private final byte[] key;
 
 	/**
-	 * A KeyEncryptor constructor.
+	 * A DefaultKeyEncryptor constructor.
 	 *
 	 * @param password The key password
 	 */
-	public KeyEncryptor(byte[] password) throws Exception {
+	public DefaultKeyEncryptor(byte[] password) throws Exception {
 		MessageDigest md = MessageDigest.getInstance(CryptoUtils.MESSAGE_DIGEST_ALGORITHM);
 		byte[] digest = md.digest(password);
 		key = new byte[size];
@@ -51,6 +52,7 @@ public class KeyEncryptor {
 	 * @param encryptedKey The encrypted key
 	 * @return The decrypted key
 	 */
+	@Override
 	public byte[] decrypt(byte[] encryptedKey) throws Exception {
 		return LTPACrypto.decrypt(encryptedKey, key, CIPHER);
 	}
@@ -61,6 +63,7 @@ public class KeyEncryptor {
 	 * @param key The key
 	 * @return The encrypted key
 	 */
+	@Override
 	public byte[] encrypt(byte[] key) throws Exception {
 		return LTPACrypto.encrypt(key, this.key, CIPHER);
 	}

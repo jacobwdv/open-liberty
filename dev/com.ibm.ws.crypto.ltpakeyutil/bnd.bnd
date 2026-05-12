@@ -31,9 +31,14 @@ Service-Component:\
     properties:="\
       service.vendor=IBM,\
       classes=com.ibm.ws.crypto.ltpakeyutil.LTPAPrivateKey|\
-              com.ibm.ws.crypto.ltpakeyutil.LTPAPublicKey"
+              com.ibm.ws.crypto.ltpakeyutil.LTPAPublicKey",\
+  com.ibm.ws.crypto.ltpakeyutil.defaultKeyEncryptorFactory;\
+    implementation:=com.ibm.ws.crypto.ltpakeyutil.DefaultKeyEncryptorFactory;\
+    immediate:=true;\
+    properties:='service.vendor=IBM'
 
 -buildpath: \
+	com.ibm.ws.crypto.passwordutil;version=latest, \
 	com.ibm.ws.logging;version=latest, \
 	com.ibm.ws.kernel.service;version=latest, \
 	com.ibm.ws.kernel.boot.core;version=latest, \
