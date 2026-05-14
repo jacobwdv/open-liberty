@@ -25,6 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+
 import com.ibm.websphere.ras.Tr;
 import com.ibm.websphere.ras.TraceComponent;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
@@ -646,11 +649,57 @@ public class CryptoUtils {
     public static final byte[] AES_V0_SALT = new byte[] { -89, -94, -125, 57, 76, 90, -77, 79, 50, 21, 10, -98, 47, 23, 17, 56, -61, 46, 125, -128 };
 
     public static final byte[] AES_V1_SALT = new byte[] { -89, -63, 22, 15, -121, 11, 102, 75, -91, 68, -94, -89, 96, 83, -21, -69, -45, 29, 26, 106, -18, 69, 60, -6, 108, 73,
-       111, 122, 41, -19, -78, -79, -28, 102, 57, -10, 66, 48, 54, 111, 35, 92, 59, -121, 36, 15, 14, -63, -43, 107, 63, -18,
-       87, 43, -57, 74, 0, 107, -119, -2, -7, -7, -46, -95, -44, 36, -10, 86, -119, -80, -114, 10, 85, 24, 24, -121, -30, 63,
-       59, 49, 52, -76, -122, 108, -84, 16, 4, -39, 58, 75, 9, -25, 126, 127, -96, 122, -62, -94, 71, -8, -101, -33, 57, -44,
-       -93, 86, 76, -115, 113, -124, 104, -40, -121, -9, 86, 121, -48, -57, -77, -58, 73, 7, 12, 4, 24, -81, -64, 107 };
+                                                          111, 122, 41, -19, -78, -79, -28, 102, 57, -10, 66, 48, 54, 111, 35, 92, 59, -121, 36, 15, 14, -63, -43, 107, 63, -18,
+                                                          87, 43, -57, 74, 0, 107, -119, -2, -7, -7, -46, -95, -44, 36, -10, 86, -119, -80, -114, 10, 85, 24, 24, -121, -30, 63,
+                                                          59, 49, 52, -76, -122, 108, -84, 16, 4, -39, 58, 75, 9, -25, 126, 127, -96, 122, -62, -94, 71, -8, -101, -33, 57, -44,
+                                                          -93, 86, 76, -115, 113, -124, 104, -40, -121, -9, 86, 121, -48, -57, -77, -58, 73, 7, 12, 4, 24, -81, -64, 107 };
 
     public static final int GCM_TAG_LENGTH = 128;
+
+    public static final Object KEYSTORE_TYPE_ICSF = "ICSF";
+
+    /**
+     * Retrieves an AES key from z/OS ICSF using the IBMJCECCA provider
+     *
+     * @return byte array containing the AES key, or null if retrieval fails
+     */
+    public static byte[] getAesKeyFromICSF(String icsfKeyLabel) {
+        try {
+            // Use IBMJCECCA provider to retrieve key from z/OS CKDS
+            SecretKeyFactory aesKeyFactory = SecretKeyFactory.getInstance("AES", IBMJCECCA_NAME);
+
+            // Create KeyLabelKeySpec using reflection to avoid compile-time dependency
+            // KeyLabelKeySpec is only available on z/OS with IBMJCECCA provider
+            Class<?> keyLabelKeySpecClass = Class.forName("com.ibm.crypto.hdwrCCA.provider.KeyLabelKeySpec");
+            Object spec = keyLabelKeySpecClass.getConstructor(String.class).newInstance(icsfKeyLabel);
+
+            // Generate the secret key from the key label
+            SecretKey secretKey = aesKeyFactory.generateSecret((java.security.spec.KeySpec) spec);
+
+            // Extract the raw key bytes
+            byte[] ckdsKey = secretKey.getEncoded();
+
+            // Validate key was retrieved
+            if (ckdsKey == null) {
+                if (TraceComponent.isAnyTracingEnabled() && tc.isWarningEnabled()) {
+                    Tr.warning(tc, "CKDS key not found. Falling back to default KeyEncryptor.");
+                }
+                return null;
+            }
+
+            if (TraceComponent.isAnyTracingEnabled() && tc.isInfoEnabled()) {
+                Tr.info(tc, "Successfully retrieved LTPA key from z/OS CKDS with label: " + icsfKeyLabel);
+            }
+            return ckdsKey;
+
+        } catch (Exception e) {
+            // Provider not available, class not found, key label doesn't exist, or other error
+            // Fall back to default KeyEncryptor
+            if (TraceComponent.isAnyTracingEnabled() && tc.isErrorEnabled()) {
+                Tr.error(tc, "CKDS key retrieval failed, falling back to default KeyEncryptor. Reason: " + e.getMessage());
+            }
+            return null;
+        }
+    }
 
 }

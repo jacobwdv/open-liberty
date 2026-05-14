@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import com.ibm.json.java.JSONObject;
 import com.ibm.websphere.crypto.InvalidPasswordEncodingException;
 import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.websphere.crypto.UnsupportedCryptoAlgorithmException;
+import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.crypto.util.PasswordCipherUtil;
 import com.ibm.ws.crypto.util.UnsupportedConfigurationException;
 import com.ibm.ws.kernel.productinfo.ProductInfo;
@@ -134,23 +136,23 @@ public class EncodeTask extends BaseCommandTask {
         } else {
             String encoding = argMap.get(BaseCommandTask.ARG_ENCODING);
             Map<String, String> props = BaseCommandTask.convertToProperties(argMap, stdout);
-            
+
             // 26.0.0.3+ - Require a key be specified for AES encryption
             if (encoding != null && encoding.contains("aes")) {
                 boolean hasKey = argMap.containsKey(BaseCommandTask.ARG_KEY) ||
-                                argMap.containsKey(BaseCommandTask.ARG_BASE64_KEY) ||
-                                argMap.containsKey(BaseCommandTask.ARG_AES_CONFIG_FILE);
-                
+                                 argMap.containsKey(BaseCommandTask.ARG_BASE64_KEY) ||
+                                 argMap.containsKey(BaseCommandTask.ARG_AES_CONFIG_FILE);
+
                 // On z/OS, the keyring parameter could be used instead
                 if (isZOS()) {
                     hasKey = hasKey || argMap.containsKey(BaseCommandTask.ARG_KEYRING);
                 }
-                
+
                 if (!hasKey) {
                     throw new IllegalArgumentException(getMessage("encode.aesKeyRequired"));
                 }
             }
-            
+
             // need to add the key if this is AES/SAF and keyring parameters are provided
             if (isZOS()) {
                 props = getKeyIfSAF(encoding, props);
@@ -200,27 +202,38 @@ public class EncodeTask extends BaseCommandTask {
      */
     private Map<String, String> getKeyIfSAF(String encoding, Map<String, String> props) throws Exception {
 
-        Map<String, String> p = props;
-        String cryptoKey = null;
-
         String keyring = props.get(PasswordUtil.PROPERTY_KEYRING);
         String type = props.get(PasswordUtil.PROPERTY_KEYRING_TYPE);
         String label = props.get(PasswordUtil.PROPERTY_KEY_LABEL);
 
-        if (encoding != null && encoding.trim().equalsIgnoreCase("aes")) {
-            if ((keyring != null && !keyring.isEmpty()) && (type != null && !type.isEmpty()) && (label != null && !label.isEmpty())) {
-                SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
-                cryptoKey = ek.getKey();
-                p.put(PasswordUtil.PROPERTY_CRYPTO_KEY, cryptoKey);
-            }
-        } else {
-            //This is not aes, lets error if the keyring args are used
+        if (encoding == null || !encoding.trim().equalsIgnoreCase("aes")) {
             if (keyring != null || type != null || label != null) {
                 throw new IllegalArgumentException(getMessage("saf.arg.not.aes"));
             }
+            return props;
         }
 
-        return p;
+        boolean hasKeyringConfig = keyring != null && !keyring.isEmpty()
+                                   && type != null && !type.isEmpty()
+                                   && label != null && !label.isEmpty();
+        if (hasKeyringConfig) {
+            SAFEncryptionKey ek = new SAFEncryptionKey(keyring, type, label);
+            props.put(PasswordUtil.PROPERTY_CRYPTO_KEY, ek.getKey());
+            return props;
+        }
+
+        boolean hasIcsfConfig = label != null && !label.isEmpty() && CryptoUtils.KEYSTORE_TYPE_ICSF.equals(type);
+        if (hasIcsfConfig) {
+            byte[] secretKey = CryptoUtils.getAesKeyFromICSF(label);
+            if (secretKey == null) {
+                throw new IllegalArgumentException("Failed to retrieve key from ICSF with label: " + label);
+            }
+
+            String base64Key = Base64.getEncoder().encodeToString(secretKey);
+            props.put(PasswordUtil.PROPERTY_AES_KEY, base64Key);
+        }
+
+        return props;
     }
 
     /**
