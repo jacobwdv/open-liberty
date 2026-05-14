@@ -682,7 +682,7 @@ public class CryptoUtils {
             // Validate key was retrieved
             if (ckdsKey == null) {
                 if (TraceComponent.isAnyTracingEnabled() && tc.isWarningEnabled()) {
-                    Tr.warning(tc, "CKDS key not found. Falling back to default KeyEncryptor.");
+                    Tr.warning(tc, "CKDS key not found.");
                 }
                 return null;
             }
@@ -696,7 +696,7 @@ public class CryptoUtils {
             // Provider not available, class not found, key label doesn't exist, or other error
             // Fall back to default KeyEncryptor
             if (TraceComponent.isAnyTracingEnabled() && tc.isErrorEnabled()) {
-                Tr.error(tc, "CKDS key retrieval failed, falling back to default KeyEncryptor. Reason: " + e.getMessage());
+                Tr.error(tc, "CKDS key retrieval failed. Reason: " + e.getMessage());
             }
             return null;
         }
