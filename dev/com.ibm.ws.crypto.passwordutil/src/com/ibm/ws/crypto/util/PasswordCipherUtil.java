@@ -29,6 +29,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,6 +37,7 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 import org.osgi.framework.ServiceReference;
@@ -58,6 +60,7 @@ import com.ibm.ws.crypto.util.custom.CustomUtils;
 import com.ibm.wsspi.kernel.service.utils.AtomicServiceReference;
 import com.ibm.wsspi.security.crypto.CustomPasswordEncryption;
 import com.ibm.wsspi.security.crypto.EncryptedInfo;
+import com.ibm.wsspi.security.crypto.PasswordEncryptionKeyProvider;
 
 /**
  * Utility class for password enciphering and deciphering.
@@ -89,6 +92,10 @@ public class PasswordCipherUtil {
 
     static final String KEY_ENCRYPTION_SERVICE = "customPasswordEncryption";
     private static AtomicServiceReference<CustomPasswordEncryption> customPasswordEncryption = new AtomicServiceReference<CustomPasswordEncryption>(KEY_ENCRYPTION_SERVICE);
+
+    static final String KEY_PROVIDER_SERVICE = "passwordEncryptionKeyProvider";
+    private static AtomicServiceReference<PasswordEncryptionKeyProvider> passwordEncryptionKeyProvider = new AtomicServiceReference<PasswordEncryptionKeyProvider>(KEY_PROVIDER_SERVICE);
+    private static final AtomicReference<Key> cachedProviderKey = new AtomicReference<Key>(null);
 
     private static CustomPasswordEncryption cpeImpl = null;
     private static List<CustomManifest> cms = null;
@@ -160,6 +167,7 @@ public class PasswordCipherUtil {
             logger.fine("activate : customPasswordEncryption : " + customPasswordEncryption);
         }
         customPasswordEncryption.activate(cc);
+        passwordEncryptionKeyProvider.activate(cc);
     }
 
     @Deactivate
@@ -168,6 +176,7 @@ public class PasswordCipherUtil {
             logger.fine("deactivate : customPasswordEncryption : " + customPasswordEncryption);
         }
         customPasswordEncryption.deactivate(cc);
+        passwordEncryptionKeyProvider.deactivate(cc);
     }
 
     @Reference(service = CustomPasswordEncryption.class,
@@ -192,6 +201,55 @@ public class PasswordCipherUtil {
         }
         customPasswordEncryption.unsetReference(reference);
         initializeCustomEncryption();
+    }
+
+    @Reference(service = PasswordEncryptionKeyProvider.class,
+               policy = ReferencePolicy.DYNAMIC,
+               cardinality = ReferenceCardinality.OPTIONAL,
+               policyOption = ReferencePolicyOption.GREEDY,
+               name = KEY_PROVIDER_SERVICE)
+    protected void setPasswordEncryptionKeyProvider(ServiceReference<PasswordEncryptionKeyProvider> reference) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("setPasswordEncryptionKeyProvider : reference : " + reference);
+        }
+        passwordEncryptionKeyProvider.setReference(reference);
+        // Invalidate the cached key so it is re-fetched from the new provider.
+        cachedProviderKey.set(null);
+        PasswordEncryptionKeyProvider provider = passwordEncryptionKeyProvider.getService();
+        if (provider != null) {
+            logger.log(Level.INFO, "PASSWORDUTIL_KEY_PROVIDER_SERVICE_STARTED", provider.getClass().getName());
+        }
+    }
+
+    protected void unsetPasswordEncryptionKeyProvider(ServiceReference<PasswordEncryptionKeyProvider> reference) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.fine("unsetPasswordEncryptionKeyProvider : reference : " + reference);
+        }
+        PasswordEncryptionKeyProvider provider = passwordEncryptionKeyProvider.getService();
+        if (provider != null) {
+            logger.log(Level.INFO, "PASSWORDUTIL_KEY_PROVIDER_SERVICE_STOPPED", provider.getClass().getName());
+        }
+        passwordEncryptionKeyProvider.unsetReference(reference);
+        cachedProviderKey.set(null);
+    }
+
+    /**
+     * Returns the cached {@link Key} from the registered {@link PasswordEncryptionKeyProvider},
+     * fetching and caching it on first use. Returns {@code null} if no provider is registered.
+     * Logs a warning if multiple providers are detected.
+     */
+    static Key getProviderKey() {
+        PasswordEncryptionKeyProvider provider = passwordEncryptionKeyProvider.getService();
+        if (provider == null) {
+            return null;
+        }
+        Key cached = cachedProviderKey.get();
+        if (cached != null) {
+            return cached;
+        }
+        SecretKey providerKey = provider.getKey(CryptoUtils.ENCRYPT_ALGORITHM_AES);
+        cachedProviderKey.compareAndSet(null, providerKey);
+        return cachedProviderKey.get();
     }
 
     /**
@@ -694,16 +752,24 @@ public class PasswordCipherUtil {
     }
 
     private static EncryptedInfo aesEncipherV2(byte[] decrypted_bytes,
-                                               String base64Key) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
-
+                                               String base64Key) throws InvalidKeySpecException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
+        Key providerKey = getProviderKey();
+        if (providerKey != null) {
+            return aesEncipherCommon(decrypted_bytes, providerKey);
+        }
         return aesEncipherCommon(decrypted_bytes, base64Key, AESKeyManager.KeyVersion.AES_V2);
     }
 
     private static byte[] aesDecipherV2(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
-
         int ivLen = encrypted_bytes[1];
         int cipherBytesStart = ivLen + 2;
         GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 2, ivLen);
+        Key providerKey = getProviderKey();
+        if (providerKey != null) {
+            byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, providerKey, iv, encrypted_bytes, cipherBytesStart,
+                                                 encrypted_bytes.length - cipherBytesStart);
+            return removeSeed(decrypted);
+        }
         byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, AESKeyManager.KeyVersion.AES_V2, iv, encrypted_bytes, cipherBytesStart,
                                              encrypted_bytes.length - cipherBytesStart);
         return removeSeed(decrypted);
@@ -736,7 +802,28 @@ public class PasswordCipherUtil {
 
     private static EncryptedInfo aesEncipherCommon(byte[] decrypted_bytes,
                                                    String key,
-                                                   AESKeyManager.KeyVersion version) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
+                                                   AESKeyManager.KeyVersion version) throws InvalidKeySpecException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
+        int ver = (version == AESKeyManager.KeyVersion.AES_V1) ? 1 : 2;
+        return aesEncipherCommonWithKey(decrypted_bytes, AESKeyManager.getKey(version, key), ver);
+    }
+
+    /**
+     * Encrypt using a pre-built {@link Key} supplied directly by a {@link PasswordEncryptionKeyProvider}.
+     * Always writes version byte {@code 2} (AES_V2).
+     */
+    private static EncryptedInfo aesEncipherCommon(byte[] decrypted_bytes,
+                                                   Key key) throws UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
+        try {
+            return aesEncipherCommonWithKey(decrypted_bytes, key, 2);
+        } catch (InvalidKeySpecException e) {
+            // InvalidKeySpecException cannot be thrown when key is provided directly; rethrow as cipher exception.
+            throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
+        }
+    }
+
+    private static EncryptedInfo aesEncipherCommonWithKey(byte[] decrypted_bytes,
+                                                          Key key,
+                                                          int ver) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
         EncryptedInfo info = null;
         SecureRandom rand = new SecureRandom();
         byte[] preEncrypted = aesSetSeed(decrypted_bytes, rand);
@@ -744,12 +831,11 @@ public class PasswordCipherUtil {
             Cipher c = Cipher.getInstance(CryptoUtils.AES_GCM_CIPHER);
             // 128 is the GCM tag length. 128 is the MAX.
             GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, rand.generateSeed(c.getBlockSize()));
-            c.init(Cipher.ENCRYPT_MODE, AESKeyManager.getKey(version, key), ps);
+            c.init(Cipher.ENCRYPT_MODE, key, ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
             if (encrypted_bytes != null) {
                 byte[] ivBytes = ps.getIV();
                 byte[] updatedBytes = new byte[ivBytes.length + encrypted_bytes.length + 2];
-                int ver = (version == AESKeyManager.KeyVersion.AES_V1) ? 1 : 2;
                 updatedBytes[0] = (byte) ver; // indicates how we encoded so later on we can decode
                 updatedBytes[1] = (byte) ivBytes.length;
 
@@ -771,5 +857,26 @@ public class PasswordCipherUtil {
             throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
         }
         return info;
+    }
+
+    private static byte[] aesDecipherCommon(String cipher, Key key, AlgorithmParameterSpec ps, byte[] cipherText, int start,
+                                            int len) throws InvalidPasswordCipherException, UnsupportedCryptoAlgorithmException {
+        try {
+            Cipher c = Cipher.getInstance(cipher);
+            c.init(Cipher.DECRYPT_MODE, key, ps);
+            return c.doFinal(cipherText, start, len);
+        } catch (NoSuchPaddingException e) {
+            throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
+        } catch (NoSuchAlgorithmException e) {
+            throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
+        } catch (InvalidKeyException e) {
+            throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
+        } catch (InvalidAlgorithmParameterException e) {
+            throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
+        } catch (IllegalBlockSizeException e) {
+            throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
+        } catch (BadPaddingException e) {
+            throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
+        }
     }
 }

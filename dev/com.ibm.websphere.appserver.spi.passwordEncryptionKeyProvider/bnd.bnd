@@ -1,0 +1,31 @@
+#*******************************************************************************
+# Copyright (c) 2025 IBM Corporation and others.
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Eclipse Public License 2.0
+# which accompanies this distribution, and is available at
+# http://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#     IBM Corporation - initial API and implementation
+#*******************************************************************************
+-include= ~../cnf/resources/bnd/bundle.props
+bVersion: 1.0
+
+Bundle-Name: WebSphere Password Encryption Key Provider SPI
+Bundle-Description: WebSphere Password Encryption Key Provider SPI, version ${bVersion}
+Bundle-SymbolicName: com.ibm.websphere.appserver.spi.passwordEncryptionKeyProvider
+
+Import-Package: com.ibm.wsspi.security.crypto
+
+Export-Package: com.ibm.wsspi.security.crypto
+
+-includeresource: {META-INF/maven/com.ibm.websphere.appserver.spi/com.ibm.websphere.appserver.spi.passwordEncryptionKeyProvider/pom.xml=com.ibm.websphere.appserver.spi.passwordEncryptionKeyProvider.pom}
+
+-maven-dependencies:
+
+publish.wlp.jar.suffix: dev/spi/ibm
+
+-buildpath: \
+	com.ibm.ws.crypto.passwordutil;version=latest
