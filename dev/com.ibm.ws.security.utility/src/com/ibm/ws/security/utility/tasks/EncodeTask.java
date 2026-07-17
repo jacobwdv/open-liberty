@@ -139,13 +139,14 @@ public class EncodeTask extends BaseCommandTask {
             if (encoding != null && encoding.contains("aes")) {
                 boolean hasKey = argMap.containsKey(BaseCommandTask.ARG_KEY) ||
                                 argMap.containsKey(BaseCommandTask.ARG_BASE64_KEY) ||
-                                argMap.containsKey(BaseCommandTask.ARG_AES_CONFIG_FILE);
-                
+                                argMap.containsKey(BaseCommandTask.ARG_AES_CONFIG_FILE) ||
+                                PasswordCipherUtil.isKeyProviderAvailable();
+
                 // On z/OS, the keyring parameter could be used instead
                 if (isZOS()) {
                     hasKey = hasKey || argMap.containsKey(BaseCommandTask.ARG_KEYRING);
                 }
-                
+
                 if (!hasKey) {
                     throw new IllegalArgumentException(getMessage("encode.aesKeyRequired"));
                 }

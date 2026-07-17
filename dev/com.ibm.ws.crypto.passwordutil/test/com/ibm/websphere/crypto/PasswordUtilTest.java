@@ -22,6 +22,7 @@ import static org.mockito.Mockito.times;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -31,6 +32,8 @@ import java.util.Map;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -39,6 +42,7 @@ import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.crypto.util.AESKeyManager;
 import com.ibm.ws.crypto.util.AESKeyManager.KeyVersion;
 import com.ibm.ws.crypto.util.AesConfigFileParser;
+import com.ibm.ws.crypto.util.PasswordCipherUtil;
 import com.ibm.wsspi.security.crypto.PasswordEncryptException;
 
 import test.common.SharedOutputManager;
@@ -48,6 +52,33 @@ import test.common.SharedOutputManager;
  */
 public class PasswordUtilTest {
     private static SharedOutputManager outputMgr;
+
+    /** Saved value of the keyProviderImpl field, restored after this class's tests run. */
+    private static Object savedKeyProviderImpl;
+
+    /**
+     * Clear the CLI-loaded PasswordEncryptionKeyProvider for the duration of this test class
+     * so that tests which validate the standard AES-V2 / resolver-key path are not polluted by
+     * any key provider JAR that may be installed in the local WLP image.
+     * The static initialiser of PasswordCipherUtil may have already loaded a provider from
+     * bin/tools/extensions/ws-passwordEncryptionKeyProvider/ if that directory is present in
+     * the build WLP image.
+     */
+    @BeforeClass
+    public static void clearKeyProviderImpl() throws Exception {
+        Field f = PasswordCipherUtil.class.getDeclaredField("keyProviderImpl");
+        f.setAccessible(true);
+        savedKeyProviderImpl = f.get(null);
+        f.set(null, null);
+    }
+
+    /** Restore the CLI-loaded PasswordEncryptionKeyProvider after this test class finishes. */
+    @AfterClass
+    public static void restoreKeyProviderImpl() throws Exception {
+        Field f = PasswordCipherUtil.class.getDeclaredField("keyProviderImpl");
+        f.setAccessible(true);
+        f.set(null, savedKeyProviderImpl);
+    }
 
     /**
      * Capture stdout/stderr output to the manager.

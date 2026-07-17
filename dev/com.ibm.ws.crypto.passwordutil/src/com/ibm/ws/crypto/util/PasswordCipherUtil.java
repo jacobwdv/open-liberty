@@ -100,6 +100,9 @@ public class PasswordCipherUtil {
     private static CustomPasswordEncryption cpeImpl = null;
     private static List<CustomManifest> cms = null;
 
+    /** CLI-loaded {@link PasswordEncryptionKeyProvider}, non-null only in command-line mode. */
+    private static PasswordEncryptionKeyProvider keyProviderImpl = null;
+
     private static boolean alreadyLoggedAESWeakPasswordAlgoWarning = false;
     private static boolean alreadyLoggedHASHWeakPasswordAlgoWarning = false;
     private static boolean alreadyLoggedAESDefaultKeyWarning = false;
@@ -116,7 +119,7 @@ public class PasswordCipherUtil {
         }
     }
 
-    static protected void initialize() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+    static protected void initialize() throws IOException, ReflectiveOperationException {
         //        if (CustomUtils.isCommandLine() && CustomUtils.isCustomEnabled()) {
         if (CustomUtils.isCommandLine()) {
             cms = CustomUtils.findCustomEncryption(CustomUtils.CUSTOM_ENCRYPTION_DIR);
@@ -128,6 +131,10 @@ public class PasswordCipherUtil {
                     SUPPORTED_CRYPTO_ALGORITHMS = SUPPORTED_CRYPTO_ALGORITHMS_CUSTOM;
                 }
             }
+            // Load PasswordEncryptionKeyProvider from CLI extension directory if present.
+            // Uses a URLClassLoader built from the discovered JAR so the class is resolvable
+            // even when the JAR is not on the JVM system classpath.
+            keyProviderImpl = CustomUtils.findAndInstantiateKeyProvider();
         }
     }
 
@@ -234,12 +241,29 @@ public class PasswordCipherUtil {
     }
 
     /**
+     * Returns {@code true} if a {@link PasswordEncryptionKeyProvider} is available either as an
+     * OSGi service (server runtime) or as a CLI extension (command-line tools).
+     * Used by {@code EncodeTask} to determine whether an explicit key argument is still required.
+     */
+    public static boolean isKeyProviderAvailable() {
+        return passwordEncryptionKeyProvider.getService() != null || keyProviderImpl != null;
+    }
+
+    /**
      * Returns the cached {@link Key} from the registered {@link PasswordEncryptionKeyProvider},
      * fetching and caching it on first use. Returns {@code null} if no provider is registered.
-     * Logs a warning if multiple providers are detected.
+     * In OSGi runtime mode the provider is consumed as an OSGi service. In CLI / command-line mode
+     * the provider is loaded from the {@code bin/tools/extensions/ws-passwordEncryptionKeyProvider/}
+     * extension directory during {@link #initialize()}.
+     * Logs a warning if multiple OSGi providers are detected.
      */
     static Key getProviderKey() {
+        // OSGi path (runtime server).
         PasswordEncryptionKeyProvider provider = passwordEncryptionKeyProvider.getService();
+        // CLI path (securityUtility / command-line tools).
+        if (provider == null) {
+            provider = keyProviderImpl;
+        }
         if (provider == null) {
             return null;
         }
@@ -352,10 +376,16 @@ public class PasswordCipherUtil {
      */
     private static void checkAndLogDefaultKeyWarning(AESKeyManager.KeyVersion version) {
         if (!!!alreadyLoggedAESDefaultKeyWarning) {
+            // If a key provider is registered, the provider supplies the key for new (V2)
+            // encryptions. Passwords encrypted under V0/V1 pre-date the provider and the
+            // "default key" warning is not applicable — suppress it.
+            if (isKeyProviderAvailable()) {
+                return;
+            }
             char[] keyChars = AESKeyManager.getKeyCharsUsingResolver(version, null);
             String keyString = new String(keyChars);
-            
-            if (AESKeyManager.PROPERTY_WLP_PASSWORD_ENCRYPTION_KEY.equals(keyString) ) {
+
+            if (AESKeyManager.PROPERTY_WLP_PASSWORD_ENCRYPTION_KEY.equals(keyString)) {
                 logger.logp(Level.WARNING, PasswordCipherUtil.class.getName(), "checkAndLogDefaultKeyWarning",
                             "PASSWORDUTIL_DEFAULT_KEY_WARNING");
                 alreadyLoggedAESDefaultKeyWarning = true;

@@ -17,8 +17,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.integration.junit4.JUnit4Mockery;
@@ -115,7 +113,7 @@ public class PasswordCipherUtilTest {
      * @throws
      */
     @Test
-    public void testListCustom() throws UnsupportedConfigurationException, ClassNotFoundException, IllegalAccessException, InstantiationException, IOException, NoSuchMethodException, InvocationTargetException {
+    public void testListCustom() throws UnsupportedConfigurationException, ReflectiveOperationException, IOException {
         final String expected = "[{\"name\":\"custom\",\"featurename\":\"usr:simpleCustomEncryption-1.0\",\"description\":\"simpleCustomEncryption default resource\"}]";
 
         String currentDir = System.clearProperty(KEY_PROP_INSTALL_DIR);

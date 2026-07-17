@@ -1,0 +1,1 @@
+IBM-KeyProviderClass: com.ibm.ws.crypto.util.custom.SimpleKeyProvider

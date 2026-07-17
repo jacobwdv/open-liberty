@@ -310,4 +310,71 @@ public class PasswordEncryptionKeyProviderTest {
         pcu2.unsetPasswordEncryptionKeyProvider(secondRef);
         pcu2.deactivate(cc);
     }
+
+    /**
+     * When a PasswordEncryptionKeyProvider is registered, decrypting a legacy V0/V1 AES password
+     * must NOT emit the CWWKS1865W "default key" warning — the provider is handling security.
+     */
+    @Test
+    public void testDefaultKeyWarningNotLoggedWhenProviderActive() throws Exception {
+        SecretKey key = generateAes256Key();
+        activateWithProvider(key);
+
+        // Reset the one-shot warning flag so we can detect if it fires.
+        java.lang.reflect.Field flag = PasswordCipherUtil.class.getDeclaredField("alreadyLoggedAESDefaultKeyWarning");
+        flag.setAccessible(true);
+        flag.set(null, false);
+
+        // Encrypt a V1 password without the provider so we get a default-key ciphertext to decrypt.
+        pcu.unsetPasswordEncryptionKeyProvider(providerRef);
+        activated = false; // prevent double-unset in tearDown
+        String encoded = PasswordUtil.encode("testPassword", "aes", new java.util.HashMap<>());
+        byte versionByte = java.util.Base64.getDecoder().decode(encoded.substring("{aes}".length()))[0];
+        org.junit.Assert.assertTrue("Expected a V0 or V1 ciphertext for this test", versionByte == 0 || versionByte == 1);
+
+        // Re-register the provider and reset the warning flag.
+        pcu.setPasswordEncryptionKeyProvider(providerRef);
+        activated = true;
+        flag.set(null, false);
+
+        // Decrypt the V0/V1 ciphertext with the provider active — warning must NOT fire.
+        outputMgr.resetStreams();
+        String decoded = PasswordUtil.decode(encoded);
+        org.junit.Assert.assertEquals("Decoding must still yield the original plaintext", "testPassword", decoded);
+        org.junit.Assert.assertFalse("CWWKS1865W must NOT be logged when a key provider is active",
+                                     outputMgr.checkForMessages("CWWKS1865W"));
+    }
+
+    /**
+     * CLI path: when PasswordCipherUtil.initialize() is called in command-line mode
+     * with wlp.install.dir pointing to a root that has a ws-passwordEncryptionKeyProvider
+     * extension JAR, getProviderKey() returns a non-null key and isKeyProviderAvailable()
+     * returns true.
+     */
+    @Test
+    public void testCliKeyProviderLoadedViaInitialize() throws Exception {
+        // Make sure no OSGi provider is registered (clean state from setUp / tearDown).
+        final String testBuildDir = System.getProperty("test.buildDir", "generated");
+        final String providerRoot = testBuildDir + "/test/test_data/simple_key_provider";
+
+        String savedDir = System.setProperty("wlp.install.dir", providerRoot);
+        try {
+            // Re-run initialize() to simulate CLI tool startup with the key provider present.
+            PasswordCipherUtil.initialize();
+
+            Key key = PasswordCipherUtil.getProviderKey();
+            assertNotNull("getProviderKey() must return a non-null key after CLI initialize() with provider present", key);
+            assertEquals("Provider key algorithm must be AES", CryptoUtils.ENCRYPT_ALGORITHM_AES, key.getAlgorithm());
+            org.junit.Assert.assertTrue("isKeyProviderAvailable() must return true when CLI provider is loaded",
+                                        PasswordCipherUtil.isKeyProviderAvailable());
+        } finally {
+            if (savedDir != null) {
+                System.setProperty("wlp.install.dir", savedDir);
+            } else {
+                System.clearProperty("wlp.install.dir");
+            }
+            // Re-initialize to clean up static state (remove the CLI-loaded provider).
+            PasswordCipherUtil.initialize();
+        }
+    }
 }

@@ -21,6 +21,9 @@ testClasses {
     String customExtensionDir = "bin/tools/extensions/ws-customPasswordEncryption"
     String simpleCustomInputDir = "${projectDir}/test/test_data/simple_custom_encryption"
     String simpleCustomOutputDir = "${buildDir}/test/test_data/simple_custom_encryption"
+    String simpleKeyProviderInputDir = "${projectDir}/test/test_data/simple_key_provider"
+    String simpleKeyProviderOutputDir = "${buildDir}/test/test_data/simple_key_provider"
+    String keyProviderExtensionDir = "bin/tools/extensions/ws-passwordEncryptionKeyProvider"
 
     // create tool classpath jars
     new File("${extJarOutputDir}").mkdirs()
@@ -54,5 +57,17 @@ testClasses {
       into "${simpleCustomOutputDir}"
     }
     ant.jar(destfile: "${simpleCustomOutputDir}/bin/tools/ws-securityutil.jar", manifest: "${extJarInputDir}/one_extension/META-INF/MANIFEST.MF")
+
+    // create the test data for SimpleKeyProvider (PasswordEncryptionKeyProvider CLI extension)
+    // The JAR must contain the compiled SimpleKeyProvider.class so the URLClassLoader can instantiate it.
+    new File("${simpleKeyProviderOutputDir}/${keyProviderExtensionDir}").mkdirs()
+    ant.jar(destfile: "${simpleKeyProviderOutputDir}/${keyProviderExtensionDir}/simpleKeyProvider.jar",
+            manifest: "${simpleKeyProviderInputDir}/${keyProviderExtensionDir}/simpleKeyProvider/META-INF/MANIFEST.MF",
+            basedir: compileTestJava.destinationDirectory.getAsFile().get(),
+            includes: "com/ibm/ws/crypto/util/custom/SimpleKeyProvider.class")
+    copy {
+      from "${simpleKeyProviderInputDir}"
+      into "${simpleKeyProviderOutputDir}"
+    }
   }
 }

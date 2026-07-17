@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
@@ -25,12 +26,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.ibm.ws.crypto.util.MessageUtils;
 import com.ibm.ws.kernel.provisioning.ProductExtension;
 import com.ibm.ws.kernel.provisioning.ProductExtensionInfo;
+import com.ibm.wsspi.security.crypto.PasswordEncryptionKeyProvider;
 
 /**
  * CustomUtils: Provides helper methods in order to plug in some extension classes
@@ -41,6 +44,7 @@ public class CustomUtils {
     private static Logger logger = Logger.getLogger(CLASS_NAME.getCanonicalName(), MessageUtils.RB);
 
     public static final String CUSTOM_ENCRYPTION_DIR = "ws-customPasswordEncryption";
+    public static final String KEY_PROVIDER_DIR = "ws-passwordEncryptionKeyProvider";
     static final String USER_FEATURE_DIR = "usr/extension/";
 
     private static final String RESOURCE_FILE_EXT = ".properties";
@@ -49,6 +53,8 @@ public class CustomUtils {
     private static final String KEY_FEATURE_NAME = "featurename";
     private static final String KEY_DESCRIPTION_NAME = "description";
     private static final String TOOL_EXTENSION_DIR = "bin/tools/extensions/";
+    /** Manifest header used in key provider JARs to name the {@link com.ibm.wsspi.security.crypto.PasswordEncryptionKeyProvider} implementation class. */
+    public static final String HDR_KEY_PROVIDER_CLASS = "IBM-KeyProviderClass";
 
     /**
      * Returns true when the value of wlp.process.type is neither server nor client.
@@ -172,12 +178,85 @@ public class CustomUtils {
     /**
      * Find the URL of the jar file which includes specified class.
      * If there is none, return empty array.
-     * 
+     *
      * @throws IOException
      */
     public static List<CustomManifest> findCustomEncryption(String extension) throws IOException {
         List<File> dirs = listRootAndExtensionDirectories();
         return findCustomEncryption(dirs, TOOL_EXTENSION_DIR + extension);
+    }
+
+    /**
+     * Scans the {@code bin/tools/extensions/ws-passwordEncryptionKeyProvider/} directory
+     * (and equivalent product-extension directories) for a JAR whose manifest contains an
+     * {@code IBM-KeyProviderClass} header, instantiates the named class using a
+     * {@link URLClassLoader} constructed from that JAR file, and returns the instance.
+     *
+     * <p>Using a dedicated {@code URLClassLoader} ensures the provider class is loadable
+     * even when the extension JAR is not on the JVM system classpath.
+     *
+     * <p>If multiple JARs with the header are found, a warning is logged and the first
+     * one discovered is used.
+     *
+     * @return an instantiated {@link PasswordEncryptionKeyProvider}, or {@code null} if none found
+     * @throws IOException                  if a file operation fails
+     * @throws ClassNotFoundException       if the named class is not found in the discovered JAR
+     * @throws ReflectiveOperationException if instantiation fails
+     */
+    public static PasswordEncryptionKeyProvider findAndInstantiateKeyProvider() throws IOException,
+            ClassNotFoundException, ReflectiveOperationException {
+        List<File> dirs = listRootAndExtensionDirectories();
+        String path = TOOL_EXTENSION_DIR + KEY_PROVIDER_DIR;
+
+        List<File>   jarFiles   = new ArrayList<File>();
+        List<String> classNames = new ArrayList<String>();
+
+        for (File root : dirs) {
+            File dir = new File(root, path);
+            if (exists(dir)) {
+                File[] files = listFiles(dir);
+                if (files != null) {
+                    for (File file : files) {
+                        if (isFile(file) && file.getName().toLowerCase().endsWith(JAR_FILE_EXT)) {
+                            try {
+                                JarFile jar = new JarFile(file);
+                                try {
+                                    String implClass = jar.getManifest().getMainAttributes().getValue(HDR_KEY_PROVIDER_CLASS);
+                                    if (implClass != null && !implClass.trim().isEmpty()) {
+                                        jarFiles.add(file);
+                                        classNames.add(implClass.trim());
+                                    }
+                                } finally {
+                                    jar.close();
+                                }
+                            } catch (IOException e) {
+                                if (logger.isLoggable(Level.FINE)) {
+                                    logger.fine("Could not read JAR manifest from: " + file + " : " + e.getMessage());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (jarFiles.isEmpty()) {
+            return null;
+        }
+        if (jarFiles.size() > 1) {
+            logger.warning(MessageUtils.getMessage("PASSWORDUTIL_MULTIPLE_KEY_PROVIDERS",
+                                                   String.join(", ", classNames)));
+        }
+
+        // Load the provider class from the discovered JAR via a URLClassLoader so that
+        // it is resolvable even when the extension JAR is not on the system classpath.
+        File providerJar   = jarFiles.get(0);
+        String providerClass = classNames.get(0);
+        URLClassLoader cl = new URLClassLoader(
+                new URL[] { providerJar.toURI().toURL() },
+                CustomUtils.class.getClassLoader());
+        Class<?> c = cl.loadClass(providerClass);
+        return (PasswordEncryptionKeyProvider) c.getDeclaredConstructor().newInstance();
     }
 
     /**
