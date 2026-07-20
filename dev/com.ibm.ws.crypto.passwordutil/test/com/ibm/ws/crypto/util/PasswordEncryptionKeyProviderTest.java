@@ -15,6 +15,7 @@ package com.ibm.ws.crypto.util;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import java.lang.reflect.Field;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
@@ -65,14 +66,27 @@ public class PasswordEncryptionKeyProviderTest {
     private PasswordCipherUtil pcu;
     private boolean activated = false;
 
+    /** Saved CLI key provider impl, cleared for the duration of these tests. */
+    private static Object savedKeyProviderImpl;
+
     @BeforeClass
-    public static void traceSetUp() {
+    public static void traceSetUp() throws Exception {
         outputMgr.trace("*=all");
+        // Clear any CLI key provider loaded by the static initialiser from the build WLP image,
+        // so tests that expect no provider (or control the provider themselves) are not polluted.
+        Field f = PasswordCipherUtil.class.getDeclaredField("keyProviderImpl");
+        f.setAccessible(true);
+        savedKeyProviderImpl = f.get(null);
+        f.set(null, null);
     }
 
     @AfterClass
-    public static void traceTearDown() {
+    public static void traceTearDown() throws Exception {
         outputMgr.trace("*=all=disabled");
+        // Restore the saved CLI key provider impl.
+        Field f = PasswordCipherUtil.class.getDeclaredField("keyProviderImpl");
+        f.setAccessible(true);
+        f.set(null, savedKeyProviderImpl);
     }
 
     @org.junit.Before
@@ -118,9 +132,12 @@ public class PasswordEncryptionKeyProviderTest {
                 will(returnValue(1L));
                 one(providerRef).getProperty(Constants.SERVICE_RANKING);
                 will(returnValue(0));
-                one(cc).locateService(PasswordCipherUtil.KEY_PROVIDER_SERVICE, providerRef);
+                // locateService may be called more than once if setPasswordEncryptionKeyProvider
+                // is invoked multiple times within a single test (e.g. after an unset/re-set).
+                atLeast(1).of(cc).locateService(PasswordCipherUtil.KEY_PROVIDER_SERVICE, providerRef);
                 will(returnValue(provider));
-                one(provider).getKey(CryptoUtils.ENCRYPT_ALGORITHM_AES);
+                // getKey() is called once on first use (cache miss); allow more for re-bind scenarios.
+                atLeast(1).of(provider).getKey(CryptoUtils.ENCRYPT_ALGORITHM_AES);
                 will(returnValue(key));
             }
         });
