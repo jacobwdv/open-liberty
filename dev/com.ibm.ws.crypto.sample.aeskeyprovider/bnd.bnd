@@ -1,0 +1,27 @@
+-include= ~../cnf/resources/bnd/bundle.props
+bVersion=1.0
+
+Bundle-Name: WAS Sample AES Key Provider
+Bundle-SymbolicName: com.ibm.ws.crypto.sample.aeskeyprovider
+Bundle-Description: WAS Sample AES Key Provider, version=${bVersion}
+Bundle-ActivationPolicy: lazy
+
+Export-Package: \
+ com.ibm.ws.crypto.sample.aeskeyprovider;provide:=true
+
+Import-Package: *
+
+-dsannotations: \
+  com.ibm.ws.crypto.sample.aeskeyprovider.AesKeyProviderImpl
+
+instrument.disabled: true
+
+-buildpath: \
+  com.ibm.websphere.org.osgi.core;version=latest,\
+  com.ibm.websphere.org.osgi.service.component;version=latest,\
+  com.ibm.wsspi.org.osgi.service.component.annotations;version=latest, \
+  com.ibm.ws.org.osgi.annotation.versioning;version=latest, \
+  com.ibm.ws.crypto.passwordutil;version=latest
+
+publish.wlp.jar.disabled: true
+test.project: true

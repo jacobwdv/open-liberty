@@ -135,17 +135,19 @@ public class EncodeTask extends BaseCommandTask {
             String encoding = argMap.get(BaseCommandTask.ARG_ENCODING);
             Map<String, String> props = BaseCommandTask.convertToProperties(argMap, stdout);
             
-            // 26.0.0.3+ - Require a key be specified for AES encryption
-            if (encoding != null && encoding.contains("aes")) {
+            // 26.0.0.3+ - Require a key be specified for AES encryption.
+            // Exception: if an AesKeyProvider is registered via the ws-aesKeyProvider CLI
+            // extension the provider supplies the key, so no explicit argument is needed.
+            if (encoding != null && encoding.contains("aes") && !PasswordCipherUtil.hasAesKeyProvider()) {
                 boolean hasKey = argMap.containsKey(BaseCommandTask.ARG_KEY) ||
                                 argMap.containsKey(BaseCommandTask.ARG_BASE64_KEY) ||
                                 argMap.containsKey(BaseCommandTask.ARG_AES_CONFIG_FILE);
-                
+
                 // On z/OS, the keyring parameter could be used instead
                 if (isZOS()) {
                     hasKey = hasKey || argMap.containsKey(BaseCommandTask.ARG_KEYRING);
                 }
-                
+
                 if (!hasKey) {
                     throw new IllegalArgumentException(getMessage("encode.aesKeyRequired"));
                 }

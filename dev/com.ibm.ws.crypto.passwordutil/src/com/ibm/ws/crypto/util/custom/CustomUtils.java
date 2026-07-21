@@ -41,6 +41,7 @@ public class CustomUtils {
     private static Logger logger = Logger.getLogger(CLASS_NAME.getCanonicalName(), MessageUtils.RB);
 
     public static final String CUSTOM_ENCRYPTION_DIR = "ws-customPasswordEncryption";
+    public static final String AES_KEY_PROVIDER_DIR = "ws-aesKeyProvider";
     static final String USER_FEATURE_DIR = "usr/extension/";
 
     private static final String RESOURCE_FILE_EXT = ".properties";

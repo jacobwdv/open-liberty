@@ -29,7 +29,7 @@ Require-Bundle: \
     com.ibm.wsspi.org.osgi.core; location="dev/spi/spec/"; version="[1.2, 1.3)"
 
 Command-Class: com.ibm.ws.security.utility.SecurityUtility
-IBM-RequiredExtensions: ws-customPasswordEncryption
+IBM-RequiredExtensions: ws-customPasswordEncryption, ws-aesKeyProvider
 
 -outputmask: ws-securityutil.jar
 

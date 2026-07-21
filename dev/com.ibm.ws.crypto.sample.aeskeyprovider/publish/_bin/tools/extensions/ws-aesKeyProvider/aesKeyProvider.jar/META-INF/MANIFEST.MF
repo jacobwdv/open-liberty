@@ -1,0 +1,2 @@
+Require-Bundle: com.ibm.ws.crypto.sample.aeskeyprovider; version="[1,1.1)"; location="usr/extension/lib"
+IBM-ImplementationClass: com.ibm.ws.crypto.sample.aeskeyprovider.AesKeyProviderImpl
