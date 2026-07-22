@@ -59,6 +59,7 @@ public class AesKeyProviderImpl implements AesKeyProvider {
     /** {@inheritDoc} */
     @Override
     public SecretKey getKey() throws AesKeyProviderException {
+        System.out.println("JAKE: GETKEY IS CALLED!");
         return new SecretKeySpec(SAMPLE_KEY_BYTES, "AES");
     }
 }

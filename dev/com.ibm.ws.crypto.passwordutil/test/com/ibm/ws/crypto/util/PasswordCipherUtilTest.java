@@ -445,14 +445,16 @@ public class PasswordCipherUtilTest {
     }
 
     /**
-     * When a provider is registered but getKey() returns null, decrypt must log CWWKS1868E.
+     * Decryption requires the registered provider's class name to match the name embedded in the
+     * {aes:ClassName} tag. When a provider with a different class name is registered, decryption
+     * must fail with CWWKS1869E (provider not found), not silently use the wrong provider.
      */
     @Test
-    public void testDecryptThrowsWhenProviderGetKeyReturnsNull() throws Exception {
+    public void testDecryptFailsWhenProviderClassNameDoesNotMatchTag() throws Exception {
         PasswordCipherUtil pcu = new PasswordCipherUtil();
         pcu.activate(cc);
 
-        // First encrypt with a good provider to get a real {aes:ClassName} password
+        // Step 1: encrypt with GoodAesKeyProvider so the tag embeds GoodAesKeyProvider's class name.
         @SuppressWarnings("unchecked")
         ServiceReference<AesKeyProvider> goodRef = context.mock(ServiceReference.class, "goodRefForDecrypt");
         context.checking(new Expectations() {
@@ -470,9 +472,12 @@ public class PasswordCipherUtilTest {
         pcu.setAesKeyProvider(goodRef);
         String encoded = PasswordUtil.encode("testDecryptNull", "aes");
         assertNotNull(encoded);
+        assertTrue("Encoded tag must contain GoodAesKeyProvider class name",
+                   encoded.contains(GoodAesKeyProvider.class.getName()));
         pcu.unsetAesKeyProvider(goodRef);
 
-        // Now register a null-returning provider and attempt decrypt
+        // Step 2: register a provider with a *different* class name (NullKeyAesKeyProvider).
+        // Decryption must reject it because the class name does not match the tag.
         @SuppressWarnings("unchecked")
         ServiceReference<AesKeyProvider> nullRef = context.mock(ServiceReference.class, "nullRefForDecrypt");
         context.checking(new Expectations() {
@@ -490,15 +495,16 @@ public class PasswordCipherUtilTest {
         pcu.setAesKeyProvider(nullRef);
         try {
             PasswordUtil.decode(encoded);
-            fail("Expected exception when provider getKey() returns null during decrypt");
-        } catch (com.ibm.websphere.crypto.InvalidPasswordDecodingException e) {
-            // Expected — getKey() returned null, error logged, exception propagated
+            fail("Expected exception: registered provider class name does not match the tag");
+        } catch (com.ibm.websphere.crypto.InvalidPasswordDecodingException
+                 | com.ibm.websphere.crypto.UnsupportedCryptoAlgorithmException e) {
+            // Expected — class name mismatch causes "provider not found" failure
         }
         pcu.unsetAesKeyProvider(nullRef);
         pcu.deactivate(cc);
 
-        assertTrue("SEVERE message CWWKS1868E must be logged",
-                   outputMgr.checkForMessages("CWWKS1868E"));
+        assertTrue("SEVERE message CWWKS1869E must be logged (provider class name mismatch)",
+                   outputMgr.checkForMessages("CWWKS1869E"));
     }
 
     private static final String KEY_AES_KEY_PROVIDER = "aesKeyProvider";

@@ -117,22 +117,33 @@ public class PasswordCipherUtil {
         }
     }
 
-    static protected void initialize() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+    static protected void initialize() throws IOException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         //        if (CustomUtils.isCommandLine() && CustomUtils.isCustomEnabled()) {
         if (CustomUtils.isCommandLine()) {
             cms = CustomUtils.findCustomEncryption(CustomUtils.CUSTOM_ENCRYPTION_DIR);
             if (cms != null) {
                 // only support one custom encryption
                 if (cms.size() == 1) {
-                    Class<?> c = Class.forName(cms.get(0).getImplClass());
-                    cpeImpl = (CustomPasswordEncryption) c.getDeclaredConstructor().newInstance();
-                    SUPPORTED_CRYPTO_ALGORITHMS = SUPPORTED_CRYPTO_ALGORITHMS_CUSTOM;
+                    try {
+                        Class<?> c = Class.forName(cms.get(0).getImplClass());
+                        cpeImpl = (CustomPasswordEncryption) c.getDeclaredConstructor().newInstance();
+                        SUPPORTED_CRYPTO_ALGORITHMS = SUPPORTED_CRYPTO_ALGORITHMS_CUSTOM;
+                    } catch (ClassNotFoundException e) {
+                        logger.logp(Level.WARNING, PasswordCipherUtil.class.getName(), "initialize",
+                                    "PASSWORDUTIL_CUSTOM_SERVICE_DOES_NOT_EXIST");
+                    }
                 }
             }
             aesKeyProviderManifests = CustomUtils.findCustomEncryption(CustomUtils.AES_KEY_PROVIDER_DIR);
             if (aesKeyProviderManifests != null && aesKeyProviderManifests.size() == 1) {
-                Class<?> c = Class.forName(aesKeyProviderManifests.get(0).getImplClass());
-                aesKeyProviderImpl = (AesKeyProvider) c.getDeclaredConstructor().newInstance();
+                try {
+                    Class<?> c = Class.forName(aesKeyProviderManifests.get(0).getImplClass());
+                    aesKeyProviderImpl = (AesKeyProvider) c.getDeclaredConstructor().newInstance();
+                } catch (ClassNotFoundException e) {
+                    logger.logp(Level.WARNING, PasswordCipherUtil.class.getName(), "initialize",
+                                MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_NOT_FOUND",
+                                                        aesKeyProviderManifests.get(0).getImplClass()));
+                }
             }
         }
     }
@@ -347,27 +358,31 @@ public class PasswordCipherUtil {
             checkAndLogDefaultKeyWarning(AES_V1);
             return aesDecipherV1(encrypted_bytes);
         } else if (encrypted_bytes[0] == 2) {
-            AesKeyProvider provider = getAesKeyProviderImpl();
-            if (provider != null) {
-                try {
-                    javax.crypto.SecretKey key = provider.getKey();
-                    if (key == null) {
+            if (providerHint != null && !providerHint.isEmpty()) {
+                // Password was encrypted with {aes:providerClassName} — a matching provider is required
+                AesKeyProvider provider = getAesKeyProviderImpl();
+                if (provider != null && provider.getClass().getName().equals(providerHint)) {
+                    try {
+                        javax.crypto.SecretKey key = provider.getKey();
+                        if (key == null) {
+                            logger.logp(Level.SEVERE, PasswordCipherUtil.class.getName(), "aesDecipher",
+                                        MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", "getKey() returned null"));
+                            throw new InvalidPasswordCipherException(MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", "getKey() returned null"));
+                        }
+                        return aesDecipherV2WithKey(encrypted_bytes, key);
+                    } catch (AesKeyProviderException e) {
                         logger.logp(Level.SEVERE, PasswordCipherUtil.class.getName(), "aesDecipher",
-                                    MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", "getKey() returned null"));
-                        throw new InvalidPasswordCipherException(MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", "getKey() returned null"));
+                                    MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", e.getMessage()));
+                        throw (InvalidPasswordCipherException) new InvalidPasswordCipherException(e.getMessage()).initCause(e);
                     }
-                    return aesDecipherV2WithKey(encrypted_bytes, key);
-                } catch (AesKeyProviderException e) {
+                } else {
+                    // Provider not registered, or registered provider class name does not match
                     logger.logp(Level.SEVERE, PasswordCipherUtil.class.getName(), "aesDecipher",
-                                MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_ERROR", e.getMessage()));
-                    throw (InvalidPasswordCipherException) new InvalidPasswordCipherException(e.getMessage()).initCause(e);
+                                MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_NOT_FOUND", providerHint));
+                    throw new InvalidPasswordCipherException(MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_NOT_FOUND", providerHint));
                 }
-            } else if (providerHint != null && !providerHint.isEmpty()) {
-                // Password was encrypted by a provider that is no longer registered
-                logger.logp(Level.SEVERE, PasswordCipherUtil.class.getName(), "aesDecipher",
-                            MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_NOT_FOUND", providerHint));
-                throw new InvalidPasswordCipherException(MessageUtils.getMessage("PASSWORDUTIL_AES_KEY_PROVIDER_NOT_FOUND", providerHint));
             } else {
+                // Plain {aes} tag — decrypt with the traditional key path (no provider)
                 return aesDecipherV2(encrypted_bytes);
             }
         } else {
@@ -474,10 +489,17 @@ public class PasswordCipherUtil {
                 base64Key = properties.get(PasswordUtil.PROPERTY_AES_KEY);
             }
             if (base64Key != null) {
+                // --base64Key / PROPERTY_AES_KEY takes highest precedence
                 if (logger.isLoggable(Level.FINE))
                     logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);
                 info = aesEncipherV2(decrypted_bytes, base64Key);
+            } else if (cryptoKey != null) {
+                // --key / PROPERTY_CRYPTO_KEY takes precedence over the provider
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_CRYPTO_KEY);
+                info = aesEncipherV1(decrypted_bytes, cryptoKey);
             } else {
+                // No explicit key supplied — use the provider if one is registered
                 AesKeyProvider provider = getAesKeyProviderImpl();
                 if (provider != null) {
                     if (logger.isLoggable(Level.FINE))
@@ -485,7 +507,7 @@ public class PasswordCipherUtil {
                     info = aesEncipherV2WithProvider(decrypted_bytes, provider);
                 } else {
                     if (logger.isLoggable(Level.FINE))
-                        logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_CRYPTO_KEY);
+                        logger.fine("Encrypting password using default key");
                     info = aesEncipherV1(decrypted_bytes, cryptoKey);
                 }
             }

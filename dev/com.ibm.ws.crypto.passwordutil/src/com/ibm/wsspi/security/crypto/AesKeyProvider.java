@@ -31,9 +31,15 @@ import javax.crypto.SecretKey;
  *   <li>The key must be exactly 256 bits (32 bytes).</li>
  * </ul>
  *
- * <p><strong>Precedence:</strong> When registered, this provider takes precedence over the
- * {@code wlp.aes.encryption.key} server variable. The {@code --passwordBase64Key} CLI argument
- * still takes precedence over this provider.</p>
+ * <p><strong>Precedence (encoding):</strong> An explicit {@code --base64Key} argument takes
+ * highest precedence, followed by an explicit {@code --key} argument. This provider is only
+ * used when neither {@code --base64Key} nor {@code --key} is supplied.</p>
+ *
+ * <p><strong>Decryption:</strong> This provider is only invoked when the stored password tag
+ * contains the provider class name, i.e. {@code {aes:fully.qualified.ClassName}}. Passwords
+ * stored as plain {@code {aes}} are decrypted using the traditional key path. Furthermore, the
+ * registered provider's fully-qualified class name must exactly match the name embedded in the
+ * tag; if it does not (or no provider is registered), decryption fails with a clear error.</p>
  *
  * <p><strong>Performance note:</strong> {@code getKey()} may be called on every encrypt and decrypt
  * operation. Implementations that retrieve the key from an external source (such as a key vault)
