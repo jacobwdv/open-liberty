@@ -17,6 +17,7 @@ import java.util.Properties;
 import com.ibm.websphere.ras.annotation.Sensitive;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
 import com.ibm.wsspi.kernel.service.location.WsLocationAdmin;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
 
 /**
  * Utility class to create the LTPA keys file.
@@ -54,5 +55,23 @@ public interface LTPAKeyFileCreator extends LTPAKeyFileUtility {
      */
     public Properties createLTPAKeysFile(WsLocationAdmin locService, String keyFile, @Sensitive byte[] keyPasswordBytes,
                                          @Sensitive byte[] sharedKeyBytes, @Sensitive byte[] privateKeyBytes, @Sensitive byte[] publicKeyBytes) throws Exception;
+
+    /**
+     * Create the LTPA keys file at the specified location using an explicit {@link AesKeyProvider}.
+     * Fresh key material (shared, private, public) is generated automatically.
+     * <p>
+     * Access the keyFile using the WsLocationAdmin.
+     * <p>
+     * When this overload is used for encryption, the matching decryption call must also use
+     * the same provider-backed mode, because the on-disk LTPA key file format does not record
+     * which cipher was used.
+     *
+     * @param locService
+     * @param keyFile
+     * @param provider   The AES key provider that supplies the encryption key
+     * @return A Properties object containing the various attributes created for the LTPA keys
+     * @throws Exception
+     */
+    public Properties createLTPAKeysFile(WsLocationAdmin locService, String keyFile, AesKeyProvider provider) throws Exception;
 
 }

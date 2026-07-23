@@ -74,6 +74,11 @@ public interface LTPAConfiguration {
     static final String CFG_KEY_VALIDATION_VALID_UNTIL_DATE = "validUntilDate";
 
     /**
+     * Whether to use the shared AES key provider for LTPA key encryption and decryption.
+     */
+    public static final String CFG_KEY_USE_AES_KEY_PROVIDER = "useAesKeyProvider";
+
+    /**
      * Internal property used to distinguish configured validation keys from non-configured validation keys.
      * Configured validation keys are explicitly defined in the server.xml using <validationKeys /> and require a password.
      * Non-configured validation keys are picked up when <ltpa monitorValidationKeysDir="true" /> is set and uses the same password as the primary ltpa key.
@@ -141,5 +146,10 @@ public interface LTPAConfiguration {
      * @return validation Keys
      */
     List<Properties> getValidationKeys();
-    
+
+    /**
+     * @return true if LTPA key encryption should use the shared AES key provider instead of password-derived encryption
+     */
+    boolean getUseAesKeyProvider();
+
 }

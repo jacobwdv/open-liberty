@@ -633,6 +633,41 @@ public class LTPAConfigurationImplTest {
                      RESOLVED_DEFAULT_OUTPUT_LOCATION, ltpaConfig.getPrimaryKeyFile());
     }
 
+    /**
+     * getUseAesKeyProvider() must return false when the property is absent (default behavior).
+     */
+    @Test
+    public void getUseAesKeyProvider_defaultsToFalse() {
+        // props was created without CFG_KEY_USE_AES_KEY_PROVIDER — default must be false.
+        org.junit.Assert.assertFalse("useAesKeyProvider should default to false",
+                                     ltpaConfig.getUseAesKeyProvider());
+    }
+
+    /**
+     * getUseAesKeyProvider() must return true when the property is explicitly set to true.
+     */
+    @Test
+    public void getUseAesKeyProvider_returnsTrueWhenSet() {
+        setupExecutorServiceExpectations(1);
+        setupLocationServiceExpectations(1);
+
+        Map<String, Object> propsWithProvider = new HashMap<String, Object>(props);
+        propsWithProvider.put(LTPAConfiguration.CFG_KEY_USE_AES_KEY_PROVIDER, Boolean.TRUE);
+        LTPAConfigurationImplTestDouble ltpaConfigWithProvider = new LTPAConfigurationImplTestDouble();
+        ltpaConfigWithProvider.setExecutorService(executorServiceRef);
+        ltpaConfigWithProvider.setLocationService(locateServiceRef);
+        ltpaConfigWithProvider.setLtpaKeysChangeNotifier(ltpaKeysChangeNotifierRef);
+        ltpaConfigWithProvider.activate(cc, propsWithProvider);
+        try {
+            assertTrue("useAesKeyProvider should be true when property is set",
+                       ltpaConfigWithProvider.getUseAesKeyProvider());
+        } finally {
+            ltpaConfigWithProvider.deactivate(cc);
+            ltpaConfigWithProvider.unsetExecutorService(executorServiceRef);
+            ltpaConfigWithProvider.unsetLocationService(locateServiceRef);
+        }
+    }
+
     @Test
     public void maskKeysPasswords_replacesPasswordWithMask() {
         setupExecutorServiceExpectations(1);

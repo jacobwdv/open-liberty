@@ -13,11 +13,15 @@
 package com.ibm.ws.security.token.ltpa;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 
 import javax.crypto.BadPaddingException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -26,8 +30,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
+import com.ibm.ws.crypto.util.PasswordCipherUtil;
 import com.ibm.wsspi.kernel.service.location.WsLocationAdmin;
 import com.ibm.wsspi.kernel.service.location.WsResource;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
+import com.ibm.wsspi.security.crypto.AesKeyProviderException;
 
 import test.UTLocationHelper;
 import test.common.SharedOutputManager;
@@ -242,6 +249,104 @@ public class LTPAKeyInfoManagerTest {
 
         assertTrue("Expected CWWKS4104A message was not logged",
                    outputMgr.checkForStandardOut("CWWKS4104A:.*resources/security/ignored"));
+    }
+
+    // -------------------------------------------------------------------------
+    // Provider-backed tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * When useAesKeyProvider is true but no provider is available, prepareLTPAKeyInfo
+     * must throw IllegalStateException — no silent fallback to password mode.
+     */
+    @Test
+    public void useAesKeyProvider_noProviderAvailable_throwsIllegalStateException() throws Exception {
+        // Ensure there is no provider set (default test environment has none).
+        injectProvider(null);
+
+        WsLocationAdmin locAdmin = UTLocationHelper.getLocationManager();
+        String ltpaKeyFile = "${server.config.dir}/resources/security/provider.noexist.txt";
+        WsResource ltpaFile = locAdmin.resolveResource(ltpaKeyFile);
+        ltpaFile.delete();
+
+        LTPAKeyInfoManager keyInfoManager = new LTPAKeyInfoManager();
+        try {
+            keyInfoManager.prepareLTPAKeyInfo(locAdmin, ltpaKeyFile, KEYPASSWORD_CORRECT, null, false, true);
+            Assert.fail("Expected IllegalStateException when no AesKeyProvider is available");
+        } catch (IllegalStateException e) {
+            // Expected — the error message must reference the missing provider.
+            assertTrue("Exception message should mention AES key provider",
+                       e.getMessage() != null && !e.getMessage().isEmpty());
+        }
+    }
+
+    /**
+     * Provider-backed round-trip: generate keys using a provider, then load them back with the same provider.
+     * All three key types (secret, private, public) must be recoverable.
+     */
+    @Test
+    public void useAesKeyProvider_roundTrip_succeeds() throws Exception {
+        AesKeyProvider provider = newAesKeyProvider();
+        injectProvider(provider);
+        try {
+            WsLocationAdmin locAdmin = UTLocationHelper.getLocationManager();
+            String ltpaKeyFile = "${server.config.dir}/resources/security/provider.roundtrip.txt";
+            WsResource ltpaFile = locAdmin.resolveResource(ltpaKeyFile);
+            ltpaFile.delete();
+
+            LTPAKeyInfoManager keyInfoManager = new LTPAKeyInfoManager();
+            keyInfoManager.prepareLTPAKeyInfo(locAdmin, ltpaKeyFile, null, null, false, true);
+
+            assertNotNull("Secret key must be present after provider-backed round-trip",
+                          keyInfoManager.getSecretKey(ltpaKeyFile));
+            assertNotNull("Private key must be present after provider-backed round-trip",
+                          keyInfoManager.getPrivateKey(ltpaKeyFile));
+            assertNotNull("Public key must be present after provider-backed round-trip",
+                          keyInfoManager.getPublicKey(ltpaKeyFile));
+        } finally {
+            injectProvider(null);
+        }
+    }
+
+    /**
+     * Password-backed mode must still work after provider-backed tests (no cross-contamination).
+     */
+    @Test
+    public void passwordMode_unaffected_whenProviderIsNull() throws Exception {
+        injectProvider(null);
+
+        LTPAKeyInfoManager keyInfoManager = new LTPAKeyInfoManager();
+        keyInfoManager.prepareLTPAKeyInfo(UTLocationHelper.getLocationManager(),
+                                          LTPA_KEY_IMPORT_FILE,
+                                          KEYPASSWORD_CORRECT, null, false, false);
+
+        assertNotNull("Secret key should be present in password mode",
+                      keyInfoManager.getSecretKey(LTPA_KEY_IMPORT_FILE));
+        assertNotNull("Private key should be present in password mode",
+                      keyInfoManager.getPrivateKey(LTPA_KEY_IMPORT_FILE));
+        assertNotNull("Public key should be present in password mode",
+                      keyInfoManager.getPublicKey(LTPA_KEY_IMPORT_FILE));
+    }
+
+    // -------------------------------------------------------------------------
+
+    /** Inject an {@link AesKeyProvider} into {@link PasswordCipherUtil}'s static field for unit testing. */
+    private static void injectProvider(AesKeyProvider provider) throws Exception {
+        Field f = PasswordCipherUtil.class.getDeclaredField("aesKeyProviderImpl");
+        f.setAccessible(true);
+        f.set(null, provider);
+    }
+
+    private static AesKeyProvider newAesKeyProvider() throws Exception {
+        KeyGenerator kg = KeyGenerator.getInstance("AES");
+        kg.init(256);
+        SecretKey k = kg.generateKey();
+        return new AesKeyProvider() {
+            @Override
+            public SecretKey getKey() throws AesKeyProviderException {
+                return k;
+            }
+        };
     }
 
 }

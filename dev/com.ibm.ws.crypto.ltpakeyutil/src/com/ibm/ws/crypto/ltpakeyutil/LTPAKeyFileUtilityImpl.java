@@ -23,6 +23,7 @@ import java.util.Properties;
 
 import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.common.encoder.Base64Coder;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
 
 /**
  * 
@@ -50,6 +51,39 @@ public class LTPAKeyFileUtilityImpl implements LTPAKeyFileUtility {
     }
 
     /**
+     * Generates the LTPA keys using a provider-backed {@link AesKeyProvider} and stores them into a Properties object.
+     *
+     * @param provider The AES key provider that supplies the encryption key
+     * @param realm
+     * @return
+     * @throws Exception
+     */
+    protected final Properties generateLTPAKeys(AesKeyProvider provider, final String realm) throws Exception {
+        return generateLTPAKeys(provider, null, null, null, realm);
+    }
+
+    /**
+     * Generates the LTPA keys using a provider-backed {@link AesKeyProvider} and stores them into a Properties object.
+     *
+     * In the case of generating new ltpa keys, pass null in sharedKeyBytes,
+     * privateKeyBytes, and publicKeyBytes to generate them.
+     *
+     * Otherwise, in the case of re-encrypting existing ltpa keys, pass the bytes in
+     * sharedKeyBytes, privateKeyBytes, and publicKeyBytes to reuse them.
+     *
+     * @param provider         The AES key provider that supplies the encryption key
+     * @param sharedKeyBytes
+     * @param privateKeyBytes
+     * @param publicKeyBytes
+     * @param realm
+     * @return
+     * @throws Exception
+     */
+    protected final Properties generateLTPAKeys(AesKeyProvider provider, byte[] sharedKeyBytes, byte[] privateKeyBytes, byte[] publicKeyBytes, final String realm) throws Exception {
+        return generateLTPAKeysInternal(new KeyEncryptor(provider), sharedKeyBytes, privateKeyBytes, publicKeyBytes, realm);
+    }
+
+    /**
      * Generates the LTPA keys and stores them into a Properties object.
      *
      * In the case of generating new ltpa keys, pass null in sharedKeyBytes,
@@ -67,10 +101,16 @@ public class LTPAKeyFileUtilityImpl implements LTPAKeyFileUtility {
      * @throws Exception
      */
     protected final Properties generateLTPAKeys(byte[] keyPasswordBytes, byte[] sharedKeyBytes, byte[] privateKeyBytes, byte[] publicKeyBytes, final String realm) throws Exception {
+        return generateLTPAKeysInternal(new KeyEncryptor(keyPasswordBytes), sharedKeyBytes, privateKeyBytes, publicKeyBytes, realm);
+    }
+
+    /**
+     * Core LTPA key generation using the supplied {@link KeyEncryptor}.
+     */
+    private Properties generateLTPAKeysInternal(KeyEncryptor encryptor, byte[] sharedKeyBytes, byte[] privateKeyBytes, byte[] publicKeyBytes, final String realm) throws Exception {
         Properties expProps = null;
 
         try {
-            KeyEncryptor encryptor = new KeyEncryptor(keyPasswordBytes);
 
             if (publicKeyBytes == null && privateKeyBytes == null) {
                 LTPAKeyPair pair = LTPADigSignature.generateLTPAKeyPair();
@@ -104,6 +144,7 @@ public class LTPAKeyFileUtilityImpl implements LTPAKeyFileUtility {
 
         return expProps;
     }
+
 
     /**
      * Obtain the OutputStream for the given file.

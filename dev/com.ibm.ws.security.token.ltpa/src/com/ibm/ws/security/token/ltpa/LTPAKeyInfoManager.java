@@ -40,6 +40,7 @@ import com.ibm.ws.security.token.ltpa.internal.LTPAKeyFileCreatorImpl;
 import com.ibm.wsspi.kernel.service.location.WsLocationAdmin;
 import com.ibm.wsspi.kernel.service.location.WsResource;
 import com.ibm.wsspi.kernel.service.utils.TimestampUtils;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
 
 /**
  * Load or create an LTPA keys file, something that looks like this:
@@ -135,8 +136,28 @@ public class LTPAKeyInfoManager {
     @SuppressWarnings("deprecation")
     public synchronized final void prepareLTPAKeyInfo(WsLocationAdmin locService, String primaryKeyImportFile, @Sensitive byte[] primaryKeyPassword,
                                                       @Sensitive List<Properties> validationKeys, boolean tryToReEncryptLtpaKeys) throws Exception {
+        prepareLTPAKeyInfo(locService, primaryKeyImportFile, primaryKeyPassword, validationKeys, tryToReEncryptLtpaKeys, false);
+    }
+
+    /**
+     * Loads the contents of the primary/validation LTPA key import file if necessary.
+     *
+     * @param primaryKeyImportFile The URL of the key import file. If it's not the URL, it is assumed as a relative path from
+     *                                 ${app.root}/config
+     * @param primaryKeyPassword   The password of the LTPA keys (used only when useAesKeyProvider is false)
+     * @param validationKeys       The validationKeys
+     * @param tryToReEncryptLtpaKeys
+     * @param useAesKeyProvider    When true, key encryption and decryption use the shared {@link AesKeyProvider} from
+     *                             {@link PasswordUtil#getAesKeyProvider()} instead of the password-derived path.
+     *                             The provider must be available; there is no silent fallback.
+     * @throws IOException
+     */
+    @SuppressWarnings("deprecation")
+    public synchronized final void prepareLTPAKeyInfo(WsLocationAdmin locService, String primaryKeyImportFile, @Sensitive byte[] primaryKeyPassword,
+                                                      @Sensitive List<Properties> validationKeys, boolean tryToReEncryptLtpaKeys,
+                                                      boolean useAesKeyProvider) throws Exception {
         if (!this.importFileCache.contains(primaryKeyImportFile)) {
-            loadLtpaKeysFile(locService, primaryKeyImportFile, primaryKeyPassword, false, false, null, tryToReEncryptLtpaKeys);
+            loadLtpaKeysFile(locService, primaryKeyImportFile, primaryKeyPassword, false, false, null, tryToReEncryptLtpaKeys, useAesKeyProvider);
         }
         if (validationKeys != null && !validationKeys.isEmpty()) {
             ltpaValidationKeysInfos.clear();
@@ -162,7 +183,9 @@ public class LTPAKeyInfoManager {
 
                     byte[] password = getKeyPasswordBytes(vKeys);
                     boolean isConfiguredValidationKey = Boolean.valueOf(vKeys.getProperty(LTPAConfiguration.INTERNAL_KEY_IS_CONFIGURED_VALIDATION_KEY));
-                    loadLtpaKeysFile(locService, filename, password, true, isConfiguredValidationKey, validUntilDateOdt, tryToReEncryptLtpaKeys);
+                    // Validation keys always use password-derived mode regardless of useAesKeyProvider,
+                    // because each validation key has its own configured password.
+                    loadLtpaKeysFile(locService, filename, password, true, isConfiguredValidationKey, validUntilDateOdt, tryToReEncryptLtpaKeys, false);
                 }
             }
         }
@@ -208,16 +231,24 @@ public class LTPAKeyInfoManager {
     }
 
     /**
-     * @param locService
-     * @param keyImportFile
-     * @param keyPassword
-     * @param validationKey
-     * @param validUntilDateOdt
+     * Loads and decrypts an LTPA key file, creating it first if it does not exist.
+     *
+     * @param locService                the location service used to resolve file paths
+     * @param keyImportFile             the path to the LTPA key file
+     * @param keyPassword               the password bytes used when {@code useAesKeyProvider} is {@code false}
+     * @param validationKey             {@code true} if this is a validation key file
+     * @param isConfiguredValidationKey {@code true} if the validation key was explicitly configured
+     * @param validUntilDateOdt         optional expiry date for validation keys
+     * @param tryToReEncryptLtpaKeys    whether to attempt legacy re-encryption on decryption failure
+     * @param useAesKeyProvider         when {@code true}, both encryption and decryption use the shared
+     *                                  {@link AesKeyProvider} from {@link PasswordUtil#getAesKeyProvider()}.
+     *                                  The file format is unchanged so both sides of a key file lifecycle
+     *                                  must use the same mode; there is no fallback to password-derived mode.
      * @throws IOException
      * @throws Exception
      */
     private void loadLtpaKeysFile(WsLocationAdmin locService, String keyImportFile, @Sensitive byte[] keyPassword, boolean validationKey, boolean isConfiguredValidationKey,
-                                  OffsetDateTime validUntilDateOdt, boolean tryToReEncryptLtpaKeys) throws IOException, Exception {
+                                  OffsetDateTime validUntilDateOdt, boolean tryToReEncryptLtpaKeys, boolean useAesKeyProvider) throws IOException, Exception {
         // Need to load the key import file
         if (TraceComponent.isAnyTracingEnabled() && tc.isEventEnabled()) {
             Tr.event(this, tc, "Loading LTPA " + (validationKey == true ? "validation" : "primary") + "Keys file: " + keyImportFile);
@@ -246,7 +277,7 @@ public class LTPAKeyInfoManager {
                         props = loadPropertiesFile(ltpaKeyFileResource);
                     } else {
                         //regenerate the primary key
-                        props = createPrimaryKeyFile(locService, keyImportFile, keyPassword);
+                        props = createPrimaryKeyFile(locService, keyImportFile, keyPassword, useAesKeyProvider);
                     }
                 }
             }
@@ -255,7 +286,7 @@ public class LTPAKeyInfoManager {
             Tr.error(tc, "LTPA_KEYS_FILE_DOES_NOT_EXIST", keyImportFile);
             return;
         } else { //Primary keys file does not exist so create the primary key
-            props = createPrimaryKeyFile(locService, keyImportFile, keyPassword);
+            props = createPrimaryKeyFile(locService, keyImportFile, keyPassword, useAesKeyProvider);
         }
 
         if (props == null || props.isEmpty()) {
@@ -270,10 +301,11 @@ public class LTPAKeyInfoManager {
         byte[][] keys;
 
         try {
-            keys = decryptKeys(keyPassword, secretKeyStr, privateKeyStr, publicKeyStr);
+            keys = decryptKeys(keyPassword, secretKeyStr, privateKeyStr, publicKeyStr, useAesKeyProvider);
         } catch (BadPaddingException e) {
             // only try to re-encrypt if it failed with keystore_password and it's not a configured validationKeys
-            if (!tryToReEncryptLtpaKeys || (validationKey && isConfiguredValidationKey)) {
+            // Re-encryption always uses password mode; provider mode is not involved.
+            if (!tryToReEncryptLtpaKeys || (validationKey && isConfiguredValidationKey) || useAesKeyProvider) {
                 if (TraceComponent.isAnyTracingEnabled() && tc.isEventEnabled()) {
                     Tr.event(this, tc, "Error loading key; " + e);
                 }
@@ -317,10 +349,42 @@ public class LTPAKeyInfoManager {
         }
     }
 
+    /**
+     * Decrypts the three LTPA key values (secret, private, public) using the selected mode.
+     *
+     * <p>When {@code useAesKeyProvider} is {@code true}, the active {@link AesKeyProvider} is
+     * obtained from {@link PasswordUtil#getAesKeyProvider()} and used to construct a
+     * provider-backed {@link KeyEncryptor}. If no provider is available the call fails with
+     * {@link IllegalStateException} — there is no silent fallback to password-derived decryption.
+     * When {@code useAesKeyProvider} is {@code false}, the existing SHA-digest password path is used.
+     *
+     * <p>The LTPA key file format does not record which mode was used at encryption time; callers
+     * must therefore supply the same {@code useAesKeyProvider} value that was in effect when the
+     * file was written.
+     *
+     * @param keyPassword      password bytes (used only when {@code useAesKeyProvider} is {@code false})
+     * @param secretKeyStr     base-64 encoded encrypted secret key
+     * @param privateKeyStr    base-64 encoded encrypted private key
+     * @param publicKeyStr     base-64 encoded public key (not encrypted)
+     * @param useAesKeyProvider whether to use the shared provider-backed cipher path
+     * @return array of three byte arrays: {@code [secretKey, privateKey, publicKey]}
+     * @throws IllegalStateException if {@code useAesKeyProvider} is {@code true} but no provider is available
+     */
     @Sensitive
     private byte[][] decryptKeys(@Sensitive byte[] keyPassword, @Sensitive String secretKeyStr, @Sensitive String privateKeyStr,
-                                 @Sensitive String publicKeyStr) throws Exception {
-        KeyEncryptor encryptor = new KeyEncryptor(keyPassword);
+                                 @Sensitive String publicKeyStr, boolean useAesKeyProvider) throws Exception {
+        KeyEncryptor encryptor;
+        if (useAesKeyProvider) {
+            AesKeyProvider provider = PasswordUtil.getAesKeyProvider();
+            if (provider == null) {
+                Tr.error(tc, "LTPA_AES_KEY_PROVIDER_NOT_FOUND");
+                String formattedMessage = Tr.formatMessage(tc, "LTPA_AES_KEY_PROVIDER_NOT_FOUND");
+                throw new IllegalStateException(formattedMessage);
+            }
+            encryptor = new KeyEncryptor(provider);
+        } else {
+            encryptor = new KeyEncryptor(keyPassword);
+        }
         byte[] secretKey, privateKey, publicKey;
         // Secret key
         if ((secretKeyStr == null) || (secretKeyStr.length() == 0)) {
@@ -358,7 +422,8 @@ public class LTPAKeyInfoManager {
                                       String keyImportFile, WsResource ltpaKeyFileResource, Exception originalException) throws Exception {
         try {
             // failed with keystore_password... let's try again with the legacy default password
-            byte[][] keys = decryptKeys(keyPasswordToTry, secretKeyStr, privateKeyStr, publicKeyStr);
+            // Re-encryption is always password-mode; provider mode is excluded by the caller guard.
+            byte[][] keys = decryptKeys(keyPasswordToTry, secretKeyStr, privateKeyStr, publicKeyStr, false);
 
             // successfully decrypted keys; backup and re-encrypt the keys using keystore_password
             Tr.info(tc, "LTPA_KEYS_REENCRYPT", keyImportFile);
@@ -465,18 +530,38 @@ public class LTPAKeyInfoManager {
     }
 
     /**
-     * @param locService
-     * @param keyImportFile
-     * @param keyPassword
-     * @return
+     * Generates and writes the primary LTPA key file.
+     *
+     * @param locService        the location service used to resolve the file path
+     * @param keyImportFile     the path to the LTPA key file to create
+     * @param keyPassword       password bytes used when {@code useAesKeyProvider} is {@code false}
+     * @param useAesKeyProvider when {@code true}, the shared {@link AesKeyProvider} from
+     *                          {@link PasswordUtil#getAesKeyProvider()} is used to encrypt the generated
+     *                          keys. If no provider is available the call fails with
+     *                          {@link IllegalStateException}. Decryption of the resulting file must also
+     *                          use provider-backed mode because the file format does not record the cipher.
+     * @return the properties written to the key file
+     * @throws IllegalStateException if {@code useAesKeyProvider} is {@code true} but no provider is available
      * @throws Exception
      */
-    private Properties createPrimaryKeyFile(WsLocationAdmin locService, String keyImportFile, @Sensitive byte[] keyPassword) throws Exception {
+    private Properties createPrimaryKeyFile(WsLocationAdmin locService, String keyImportFile, @Sensitive byte[] keyPassword,
+                                            boolean useAesKeyProvider) throws Exception {
         long start = System.currentTimeMillis();
         Tr.info(tc, "LTPA_CREATE_KEYS_START");
 
         LTPAKeyFileCreator creator = new LTPAKeyFileCreatorImpl();
-        Properties props = creator.createLTPAKeysFile(locService, keyImportFile, keyPassword);
+        Properties props;
+        if (useAesKeyProvider) {
+            AesKeyProvider provider = PasswordUtil.getAesKeyProvider();
+            if (provider == null) {
+                Tr.error(tc, "LTPA_AES_KEY_PROVIDER_NOT_FOUND");
+                String formattedMessage = Tr.formatMessage(tc, "LTPA_AES_KEY_PROVIDER_NOT_FOUND");
+                throw new IllegalStateException(formattedMessage);
+            }
+            props = creator.createLTPAKeysFile(locService, keyImportFile, provider);
+        } else {
+            props = creator.createLTPAKeysFile(locService, keyImportFile, keyPassword);
+        }
 
         Tr.audit(tc, "LTPA_CREATE_KEYS_COMPLETE", TimestampUtils.getElapsedTime(start), keyImportFile);
         return props;

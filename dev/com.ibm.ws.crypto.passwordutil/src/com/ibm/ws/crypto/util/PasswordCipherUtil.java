@@ -241,6 +241,16 @@ public class PasswordCipherUtil {
         return getAesKeyProviderImpl() != null;
     }
 
+    /**
+     * Returns the currently active {@link AesKeyProvider}, or {@code null} if none is available.
+     * The OSGi-registered service takes precedence over a CLI-loaded implementation.
+     *
+     * @return the active {@link AesKeyProvider}, or {@code null}.
+     */
+    public static AesKeyProvider getAesKeyProvider() {
+        return getAesKeyProviderImpl();
+    }
+
     @Reference(service = CustomPasswordEncryption.class,
                policy = ReferencePolicy.DYNAMIC,
                cardinality = ReferenceCardinality.OPTIONAL,

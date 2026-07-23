@@ -53,6 +53,7 @@ final class LTPACrypto {
     private static final String signatureAlgorithm = CryptoUtils.getSignatureAlgorithm();
 
     private static int MAX_CACHE = 500; // has to be greater than 0 and a multiple of 5
+    private static final byte[] FIXED_PROVIDER_IV_16 = new byte[CryptoUtils.AES_256_KEY_LENGTH_BYTES];
     private static IvParameterSpec ivs8 = null;
     private static IvParameterSpec ivs16 = null;
 
@@ -663,6 +664,29 @@ final class LTPACrypto {
         return ci;
     }
 
+    @Trivial
+    private static Cipher createCipher(int cipherMode, byte[] ivKey, String cipher, SecretKey sKey, boolean providerBacked)
+            throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
+            InvalidAlgorithmParameterException, NoSuchProviderException {
+        if (!providerBacked) {
+            return createCipher(cipherMode, ivKey, cipher, sKey);
+        }
+
+        Cipher ci = (provider == null) ? Cipher.getInstance(cipher) : Cipher.getInstance(cipher, provider);
+        if (cipher.indexOf(CryptoUtils.ENCRYPT_MODE_ECB) == -1) {
+            if (cipher.indexOf(CryptoUtils.ENCRYPT_ALGORITHM_AES) != -1) {
+                setIVS16(ivKey != null ? ivKey : FIXED_PROVIDER_IV_16);
+                ci.init(cipherMode, sKey, ivs16);
+            } else {
+                setIVS8(ivKey);
+                ci.init(cipherMode, sKey, ivs8);
+            }
+        } else {
+            ci.init(cipherMode, sKey);
+        }
+        return ci;
+    }
+
     /**
      * Encrypt the data.
      *
@@ -678,6 +702,12 @@ final class LTPACrypto {
         return ci.doFinal(data);
     }
 
+    @Trivial
+    protected static final byte[] encrypt(byte[] data, byte[] ivKey, SecretKey sKey, String cipher) throws Exception {
+        Cipher ci = createCipher(Cipher.ENCRYPT_MODE, ivKey, cipher, sKey, true);
+        return ci.doFinal(data);
+    }
+ 
     /**
      * Decrypt the specified msg.
      *
@@ -690,6 +720,12 @@ final class LTPACrypto {
     protected static final byte[] decrypt(byte[] msg, byte[] key, String cipher) throws Exception {
         SecretKey sKey = constructSecretKey(key, cipher);
         Cipher ci = createCipher(Cipher.DECRYPT_MODE, key, cipher, sKey);
+        return ci.doFinal(msg);
+    }
+
+    @Trivial
+    protected static final byte[] decrypt(byte[] msg, byte[] ivKey, SecretKey sKey, String cipher) throws Exception {
+        Cipher ci = createCipher(Cipher.DECRYPT_MODE, ivKey, cipher, sKey, true);
         return ci.doFinal(msg);
     }
 

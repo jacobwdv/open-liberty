@@ -26,6 +26,7 @@ import com.ibm.wsspi.kernel.service.location.WsLocationAdmin;
 import com.ibm.wsspi.kernel.service.location.WsResource;
 import com.ibm.wsspi.kernel.service.location.WsResource.Type;
 import com.ibm.wsspi.kernel.service.utils.FileUtils;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
 import com.ibm.wsspi.security.registry.RegistryHelper;
 import org.osgi.service.component.ComponentContext;
 import com.ibm.ws.security.registry.RegistryException;
@@ -102,6 +103,15 @@ public class LTPAKeyFileCreatorImpl extends LTPAKeyFileUtilityImpl implements LT
                                          @Sensitive byte[] sharedKeyBytes, @Sensitive byte[] privateKeyBytes, @Sensitive byte[] publicKeyBytes) throws Exception {
         String realmName = isUserRegistryAvailable() ? getRealmName() : "defaultRealm";
         Properties ltpaProps = generateLTPAKeys(keyPasswordBytes, sharedKeyBytes, privateKeyBytes, publicKeyBytes, realmName);
+        addLTPAKeysToFile(getOutputStream(locService, keyFile), ltpaProps);
+        return ltpaProps;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Properties createLTPAKeysFile(WsLocationAdmin locService, String keyFile, AesKeyProvider provider) throws Exception {
+        String realmName = isUserRegistryAvailable() ? getRealmName() : "defaultRealm";
+        Properties ltpaProps = generateLTPAKeys(provider, realmName);
         addLTPAKeysToFile(getOutputStream(locService, keyFile), ltpaProps);
         return ltpaProps;
     }

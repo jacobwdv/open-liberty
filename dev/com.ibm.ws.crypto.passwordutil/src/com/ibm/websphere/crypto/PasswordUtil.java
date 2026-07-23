@@ -26,6 +26,7 @@ import com.ibm.ws.crypto.util.InvalidPasswordCipherException;
 import com.ibm.ws.crypto.util.MessageUtils;
 import com.ibm.ws.crypto.util.PasswordCipherUtil;
 import com.ibm.ws.crypto.util.PasswordHashGenerator;
+import com.ibm.wsspi.security.crypto.AesKeyProvider;
 import com.ibm.wsspi.security.crypto.EncryptedInfo;
 
 /**
@@ -788,6 +789,19 @@ public class PasswordUtil {
         }
 
         return buffer.toString();
+    }
+
+    /**
+     * Returns the currently active {@link AesKeyProvider}, or {@code null} if none is available.
+     * Delegates to the existing provider resolution in {@link PasswordCipherUtil}: the OSGi-registered
+     * service takes precedence over a CLI-loaded implementation. LTPA and other callers should use this
+     * accessor rather than resolving a provider independently, so that password encryption and LTPA
+     * always share the same provider instance.
+     *
+     * @return the active {@link AesKeyProvider}, or {@code null} if no provider is registered or loaded.
+     */
+    public static AesKeyProvider getAesKeyProvider() {
+        return PasswordCipherUtil.getAesKeyProvider();
     }
 
 }

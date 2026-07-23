@@ -100,6 +100,7 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     private long expirationDifferenceAllowed;
     private boolean monitorValidationKeysDir;
     private String updateTrigger;
+    private boolean useAesKeyProvider;
     private final List<Properties> validationKeys = new CopyOnWriteArrayList<Properties>();
     // configValidationKeys are specified in the server xml configuration
     private List<Properties> configValidationKeys = null;
@@ -208,6 +209,8 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
         expirationDifferenceAllowed = (Long) props.get(KEY_EXP_DIFF_ALLOWED);
         monitorValidationKeysDir = (Boolean) props.get(CFG_KEY_MONITOR_VALIDATION_KEYS_DIR);
         updateTrigger = (String) props.get(CFG_KEY_UPDATE_TRIGGER);
+        Boolean rawUseAesKeyProvider = (Boolean) props.get(CFG_KEY_USE_AES_KEY_PROVIDER);
+        useAesKeyProvider = rawUseAesKeyProvider != null && rawUseAesKeyProvider;
 
         //get all validationKeys elements
         Map<String, List<Map<String, Object>>> validationKeysElements = Nester.nest(props, CFG_KEY_VALIDATION_KEYS);
@@ -854,6 +857,12 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     @Override
     public String getUpdateTrigger() {
         return updateTrigger;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean getUseAesKeyProvider() {
+        return useAesKeyProvider;
     }
 
     /** {@inheritDoc} */
