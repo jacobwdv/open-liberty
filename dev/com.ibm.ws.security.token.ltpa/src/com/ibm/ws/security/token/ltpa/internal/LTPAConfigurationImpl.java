@@ -200,7 +200,9 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     @Sensitive
     private void loadConfig(Map<String, Object> props) {
         primaryKeyImportFile = (String) props.get(CFG_KEY_IMPORT_FILE);
-        primaryKeyPassword = resolvePrimaryKeyPassword(props);
+        Boolean rawUseAesKeyProvider = (Boolean) props.get(CFG_KEY_USE_AES_KEY_PROVIDER);
+        useAesKeyProvider = rawUseAesKeyProvider != null && rawUseAesKeyProvider;
+        primaryKeyPassword = resolvePrimaryKeyPassword(props, useAesKeyProvider);
         keyTokenExpiration = (Long) props.get(CFG_KEY_TOKEN_EXPIRATION);
         monitorInterval = (Long) props.get(CFG_KEY_MONITOR_INTERVAL);
         authFilterRef = (String) props.get(KEY_AUTH_FILTER_REF);
@@ -209,8 +211,6 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
         expirationDifferenceAllowed = (Long) props.get(KEY_EXP_DIFF_ALLOWED);
         monitorValidationKeysDir = (Boolean) props.get(CFG_KEY_MONITOR_VALIDATION_KEYS_DIR);
         updateTrigger = (String) props.get(CFG_KEY_UPDATE_TRIGGER);
-        Boolean rawUseAesKeyProvider = (Boolean) props.get(CFG_KEY_USE_AES_KEY_PROVIDER);
-        useAesKeyProvider = rawUseAesKeyProvider != null && rawUseAesKeyProvider;
 
         //get all validationKeys elements
         Map<String, List<Map<String, Object>>> validationKeysElements = Nester.nest(props, CFG_KEY_VALIDATION_KEYS);
@@ -246,7 +246,7 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     }
 
     @Sensitive
-    private String resolvePrimaryKeyPassword(Map<String, Object> props) {
+    private String resolvePrimaryKeyPassword(Map<String, Object> props, boolean useAesKeyProvider) {
         SerializableProtectedString sps = (SerializableProtectedString) props.get(CFG_KEY_PASSWORD);
         String keysPassword = sps == null ? null : new String(sps.getChars());
         if (keysPassword != null && !keysPassword.isEmpty()) {
@@ -264,6 +264,10 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
         if (keystorePassword != null && !keystorePassword.isEmpty()) {
             tryToReEncryptLtpaKeys = true;
             return keystorePassword;
+        }
+
+        if (useAesKeyProvider) {
+            return null;
         }
 
         String formattedMessage = Tr.formatMessage(tc, "LTPA_KEYS_PASSWORD_ERROR");

@@ -668,6 +668,33 @@ public class LTPAConfigurationImplTest {
         }
     }
 
+    /**
+     * When useAesKeyProvider="true" is set and no password is configured,
+     * primaryKeyPassword must be null (no exception should be thrown).
+     */
+    @Test
+    public void getKeyPassword_nullWhenUseAesKeyProviderTrueAndNoPasswordSet() {
+        setupExecutorServiceExpectations(1);
+        setupLocationServiceExpectations(1);
+
+        Map<String, Object> propsWithProvider = new HashMap<String, Object>(props);
+        propsWithProvider.put(LTPAConfiguration.CFG_KEY_USE_AES_KEY_PROVIDER, Boolean.TRUE);
+        propsWithProvider.remove(LTPAConfiguration.CFG_KEY_PASSWORD);
+        LTPAConfigurationImplTestDouble ltpaConfigWithProvider = new LTPAConfigurationImplTestDouble();
+        ltpaConfigWithProvider.setExecutorService(executorServiceRef);
+        ltpaConfigWithProvider.setLocationService(locateServiceRef);
+        ltpaConfigWithProvider.setLtpaKeysChangeNotifier(ltpaKeysChangeNotifierRef);
+        ltpaConfigWithProvider.activate(cc, propsWithProvider);
+        try {
+            org.junit.Assert.assertNull("primaryKeyPassword should be null when useAesKeyProvider=true and no password is set",
+                                        ltpaConfigWithProvider.getPrimaryKeyPassword());
+        } finally {
+            ltpaConfigWithProvider.deactivate(cc);
+            ltpaConfigWithProvider.unsetExecutorService(executorServiceRef);
+            ltpaConfigWithProvider.unsetLocationService(locateServiceRef);
+        }
+    }
+
     @Test
     public void maskKeysPasswords_replacesPasswordWithMask() {
         setupExecutorServiceExpectations(1);

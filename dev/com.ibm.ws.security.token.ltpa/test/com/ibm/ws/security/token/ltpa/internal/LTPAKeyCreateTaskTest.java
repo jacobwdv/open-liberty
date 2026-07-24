@@ -148,13 +148,6 @@ public class LTPAKeyCreateTaskTest {
         creator.run();
     }
 
-    private LTPAConfigurationImpl setupActivatedLTPAConfiguration(LTPAConfigurationImpl config) {
-        config.setExecutorService(executorServiceRef);
-        config.setLocationService(locationServiceRef);
-        config.activate(cc, props);
-        return config;
-    }
-
     /**
      * Test method for {@link com.ibm.ws.security.token.ltpa.internal.LTPAKeyCreateTask#call()}.
      *
@@ -219,6 +212,41 @@ public class LTPAKeyCreateTaskTest {
 
         // Check that the configReady method was called on the config object
         assertTrue("The configuration must be ready.", config.wasConfigReadyCalled);
+    }
+
+    /**
+     * When useAesKeyProvider=true and no password is set, getKeyPasswordBytes() must return null.
+     */
+    @Test
+    public void getKeyPasswordBytes_returnsNullWhenPasswordIsNull() {
+        mock.checking(new Expectations() {
+            {
+                allowing(cc).getBundleContext();
+                one(executorService).execute(with(any(Runnable.class)));
+            }
+        });
+        setupLocationServiceExpecatations();
+
+        Map<String, Object> propsWithProvider = new java.util.HashMap<>(props);
+        propsWithProvider.put(LTPAConfiguration.CFG_KEY_USE_AES_KEY_PROVIDER, Boolean.TRUE);
+        propsWithProvider.remove(LTPAConfiguration.CFG_KEY_PASSWORD);
+
+        LTPAConfigurationImpl config = setupActivatedLTPAConfiguration(new LTPAConfigurationImpl(), propsWithProvider);
+
+        LTPAKeyCreatorDouble creator = new LTPAKeyCreatorDouble(null, config);
+        org.junit.Assert.assertNull("getKeyPasswordBytes() should return null when useAesKeyProvider=true and no password is set",
+                                    creator.getKeyPasswordBytes());
+    }
+
+    private LTPAConfigurationImpl setupActivatedLTPAConfiguration(LTPAConfigurationImpl config) {
+        return setupActivatedLTPAConfiguration(config, props);
+    }
+
+    private LTPAConfigurationImpl setupActivatedLTPAConfiguration(LTPAConfigurationImpl config, Map<String, Object> configProps) {
+        config.setExecutorService(executorServiceRef);
+        config.setLocationService(locationServiceRef);
+        config.activate(cc, configProps);
+        return config;
     }
 
     private class LTPAConfigurationImplDouble extends LTPAConfigurationImpl {

@@ -49,7 +49,11 @@ class LTPAKeyCreateTask implements Runnable {
 
     @Sensitive
     byte[] getKeyPasswordBytes() {
-        return PasswordUtil.passwordDecode(config.getPrimaryKeyPassword()).getBytes();
+        String password = config.getPrimaryKeyPassword();
+        if (password == null) {
+            return null;
+        }
+        return PasswordUtil.passwordDecode(password).getBytes();
     }
 
     private LTPAKeyInfoManager getPreparedLtpaKeyInfoManager() throws Exception {
