@@ -385,6 +385,13 @@ public class PasswordCipherUtil {
                 cryptoKey = properties.get(PasswordUtil.PROPERTY_CRYPTO_KEY);
                 base64Key = properties.get(PasswordUtil.PROPERTY_AES_KEY);
             }
+            // If a hardware SecretKeyResolver (e.g. CKDS) is active, force AES_V2 regardless
+            // of what the caller supplied in the properties map. This covers application calls
+            // such as PasswordUtil.passwordEncode() that pass a null properties map.
+            // The sentinel value is never decoded — AESKeyManager.getKey(AES_V2, …) intercepts it.
+            if (base64Key == null && AESKeyManager.hasSecretKeyResolver()) {
+                base64Key = "CKDS";
+            }
             if (base64Key != null) {
                 if (logger.isLoggable(Level.FINE))
                     logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);

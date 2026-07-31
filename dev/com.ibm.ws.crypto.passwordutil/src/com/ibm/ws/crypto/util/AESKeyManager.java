@@ -27,6 +27,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.wsspi.security.crypto.KeyStringResolver;
+import com.ibm.wsspi.security.crypto.SecretKeyResolver;
 
 /**
  *
@@ -39,6 +40,7 @@ public class AESKeyManager {
     public static final String PROPERTY_WLP_BASE64_AES_ENCRYPTION_KEY = "${" + NAME_WLP_BASE64_AES_ENCRYPTION_KEY + "}";
 
     private static final AtomicReference<KeyStringResolver> _resolver = new AtomicReference<KeyStringResolver>();
+    private static final AtomicReference<SecretKeyResolver> _secretKeyResolver = new AtomicReference<SecretKeyResolver>();
 
     public static enum KeyVersion {
 
@@ -155,6 +157,16 @@ public class AESKeyManager {
     }
 
     public static Key getKey(KeyVersion version, String key) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        if (version == KeyVersion.AES_V2) {
+            SecretKeyResolver skr = _secretKeyResolver.get();
+            if (skr != null) {
+                try {
+                    return skr.getKey();
+                } catch (Exception e) {
+                    throw new InvalidKeySpecException("Failed to obtain CKDS key for label", e);
+                }
+            }
+        }
         KeyHolder holder = getHolder(version, key);
         return holder.getKey();
     }
@@ -180,6 +192,32 @@ public class AESKeyManager {
     public static char[] getKeyCharsUsingResolver(KeyVersion version, String key) {
         char[] keyChars = _resolver.get().getKey(key == null ? version.resolverProperty : key);
         return keyChars;
+    }
+
+    /**
+     * Sets a hardware-backed {@link SecretKeyResolver} (e.g. ICSF/CKDS via IBMJCECCA).
+     * When non-null, all AES_V2 encrypt and decrypt operations use this resolver directly
+     * instead of deriving a key from a char array. Also signals {@link com.ibm.ws.crypto.util.PasswordCipherUtil}
+     * to force the AES_V2 wire format for all new encryptions.
+     *
+     * @param resolver the resolver to install, or null to revert to the standard char[]-based path
+     */
+    public static void setSecretKeyResolver(SecretKeyResolver resolver) {
+        _secretKeyResolver.set(resolver);
+        // Invalidate any cached AES_V2 key so the next operation uses the new resolver
+        KeyVersion.AES_V2._key.set(null);
+    }
+
+    /**
+     * Returns true if a hardware-backed {@link SecretKeyResolver} is currently installed.
+     * Used by {@link com.ibm.ws.crypto.util.PasswordCipherUtil} to force the AES_V2 wire
+     * format for all new encrypt operations regardless of the properties map supplied by
+     * the caller.
+     *
+     * @return true if a SecretKeyResolver is active
+     */
+    public static boolean hasSecretKeyResolver() {
+        return _secretKeyResolver.get() != null;
     }
 
     /**
