@@ -40,6 +40,7 @@ import com.ibm.websphere.ras.Tr;
 import com.ibm.websphere.ras.TraceComponent;
 import com.ibm.websphere.ras.annotation.Sensitive;
 import com.ibm.ws.config.xml.nester.Nester;
+import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptorFactory;
 import com.ibm.ws.security.filemonitor.FileBasedActionable;
 import com.ibm.ws.security.filemonitor.LTPAFileMonitor;
 import com.ibm.ws.security.token.ltpa.LTPAConfiguration;
@@ -109,6 +110,23 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     private final Collection<File> currentlyDeletedFiles = new HashSet<File>();
     private static final Collection<File> allKeysFiles = new HashSet<File>();
     boolean isValidationKeysFileConfigured = false;
+    private volatile KeyEncryptorFactory keyEncryptorFactory;
+
+    protected void setKeyEncryptorFactory(KeyEncryptorFactory factory) {
+        this.keyEncryptorFactory = factory;
+    }
+
+    protected void unsetKeyEncryptorFactory(KeyEncryptorFactory factory) {
+        if (this.keyEncryptorFactory == factory) {
+            this.keyEncryptorFactory = null;
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public KeyEncryptorFactory getKeyEncryptorFactory() {
+        return keyEncryptorFactory;
+    }
 
     protected void setExecutorService(ServiceReference<ExecutorService> ref) {
         executorService.setReference(ref);
@@ -199,7 +217,19 @@ public class LTPAConfigurationImpl implements LTPAConfiguration, FileBasedAction
     @Sensitive
     private void loadConfig(Map<String, Object> props) {
         primaryKeyImportFile = (String) props.get(CFG_KEY_IMPORT_FILE);
-        primaryKeyPassword = resolvePrimaryKeyPassword(props);
+        if (keyEncryptorFactory != null) {
+            // Hardware-key path: skip password resolution entirely.
+            // Log an INFO message if keysPassword was also configured, so the user knows it is being ignored.
+            SerializableProtectedString sps = (SerializableProtectedString) props.get(CFG_KEY_PASSWORD);
+            String keysPassword = sps == null ? null : new String(sps.getChars());
+            if (keysPassword != null && !keysPassword.isEmpty()) {
+                Tr.info(tc, "LTPA_ENCRYPT_LTPA_OVERRIDES_PASSWORD");
+            }
+            primaryKeyPassword = null;
+            tryToReEncryptLtpaKeys = false;
+        } else {
+            primaryKeyPassword = resolvePrimaryKeyPassword(props);
+        }
         keyTokenExpiration = (Long) props.get(CFG_KEY_TOKEN_EXPIRATION);
         monitorInterval = (Long) props.get(CFG_KEY_MONITOR_INTERVAL);
         authFilterRef = (String) props.get(KEY_AUTH_FILTER_REF);

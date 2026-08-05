@@ -51,7 +51,9 @@ Service-Component: \
     locationService=com.ibm.wsspi.kernel.service.location.WsLocationAdmin; \
     executorService=java.util.concurrent.ExecutorService; \
     ltpaKeysChangeNotifier=com.ibm.ws.security.token.ltpa.internal.LTPAKeysChangeNotifier; \
-    dynamic:='ltpaKeysChangeNotifier'; \
+    keyEncryptorFactory=com.ibm.ws.crypto.ltpakeyutil.KeyEncryptorFactory; \
+    optional:='keyEncryptorFactory'; \
+    dynamic:='ltpaKeysChangeNotifier,keyEncryptorFactory'; \
     properties:='service.vendor=IBM,tokenType=Ltpa2,osgi.ds.satisfying.condition.target=(osgi.condition.id=io.openliberty.process.running)', \
   com.ibm.ws.security.token.ltpa.LTPATokenService; \
     implementation:=com.ibm.ws.security.token.ltpa.internal.LTPATokenService; \

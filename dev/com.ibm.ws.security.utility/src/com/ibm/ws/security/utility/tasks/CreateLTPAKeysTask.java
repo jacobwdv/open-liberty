@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
+import com.ibm.ws.crypto.ltpakeyutil.PasswordKeyEncryptor;
 import com.ibm.ws.security.utility.IFileUtility;
 import com.ibm.ws.security.utility.SecurityUtilityReturnCodes;
 import com.ibm.ws.security.utility.utils.ConsoleWrapper;
@@ -193,7 +194,7 @@ public class CreateLTPAKeysTask extends BaseCommandTask {
                 xmlSnippet = "    <ltpa keysPassword=\"" + encodedPassword + "\" keysFileName=\"" + path + "\" />";
             }
 
-            ltpaKeyFileUtil.createLTPAKeysFile(path, password.getBytes());
+            ltpaKeyFileUtil.createLTPAKeysFile(path, new PasswordKeyEncryptor(password.getBytes()));
             stdout.println(getMessage("createLTPAKeys.createdFile", path, xmlSnippet));
             return SecurityUtilityReturnCodes.OK;
         }

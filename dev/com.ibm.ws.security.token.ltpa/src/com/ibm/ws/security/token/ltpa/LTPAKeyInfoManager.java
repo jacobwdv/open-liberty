@@ -33,6 +33,7 @@ import com.ibm.websphere.ras.annotation.Sensitive;
 import com.ibm.ws.common.crypto.CryptoUtils;
 import com.ibm.ws.common.encoder.Base64Coder;
 import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptor;
+import com.ibm.ws.crypto.ltpakeyutil.PasswordKeyEncryptor;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
 import com.ibm.ws.ffdc.annotation.FFDCIgnore;
 import com.ibm.ws.security.token.ltpa.internal.LTPAKeyFileCreator;
@@ -135,34 +136,49 @@ public class LTPAKeyInfoManager {
     @SuppressWarnings("deprecation")
     public synchronized final void prepareLTPAKeyInfo(WsLocationAdmin locService, String primaryKeyImportFile, @Sensitive byte[] primaryKeyPassword,
                                                       @Sensitive List<Properties> validationKeys, boolean tryToReEncryptLtpaKeys) throws Exception {
+        prepareLTPAKeyInfo(locService, primaryKeyImportFile, new PasswordKeyEncryptor(primaryKeyPassword), validationKeys, tryToReEncryptLtpaKeys);
+    }
+
+    /**
+     * Loads the LTPA key info using the supplied {@link KeyEncryptor} (hardware or password path).
+     * This is the canonical entry point; the legacy {@code byte[]} overload delegates here.
+     *
+     * @param locService             Location service
+     * @param primaryKeyImportFile   Path to the primary LTPA key file
+     * @param encryptor              {@link KeyEncryptor} wrapping either a hardware key or a password-derived key
+     * @param validationKeys         Optional validation keys (may be null or empty)
+     * @param tryToReEncryptLtpaKeys Whether to attempt re-encryption on a bad-padding error (password path only)
+     * @throws Exception
+     */
+    public synchronized final void prepareLTPAKeyInfo(WsLocationAdmin locService, String primaryKeyImportFile,
+                                                      KeyEncryptor encryptor,
+                                                      @Sensitive List<Properties> validationKeys,
+                                                      boolean tryToReEncryptLtpaKeys) throws Exception {
         if (!this.importFileCache.contains(primaryKeyImportFile)) {
-            loadLtpaKeysFile(locService, primaryKeyImportFile, primaryKeyPassword, false, false, null, tryToReEncryptLtpaKeys);
+            loadLtpaKeysFile(locService, primaryKeyImportFile, encryptor, false, false, null, tryToReEncryptLtpaKeys);
         }
         if (validationKeys != null && !validationKeys.isEmpty()) {
             ltpaValidationKeysInfos.clear();
-            //load validationKeys
             Iterator<Properties> validationKeysIterator = validationKeys.iterator();
             while (validationKeysIterator.hasNext()) {
                 OffsetDateTime validUntilDateOdt = null;
                 Properties vKeys = validationKeysIterator.next();
                 String filename = (String) vKeys.get(LTPAConfiguration.CFG_KEY_VALIDATION_FILE_NAME);
-                if (!this.importFileCache.contains(vKeys.get(LTPAConfiguration.CFG_KEY_VALIDATION_FILE_NAME))) {
+                if (!this.importFileCache.contains(filename)) {
                     String validUntilDate = ((String) vKeys.get(LTPAConfiguration.CFG_KEY_VALIDATION_VALID_UNTIL_DATE));
                     if (validUntilDate != null) {
                         try {
                             validUntilDateOdt = OffsetDateTime.parse(validUntilDate);
                             if (validUntilDateOdt != null && isValidUntilDateExpired(filename, validUntilDateOdt)) {
-                                continue; //Skip this LTPA validationKeys
+                                continue;
                             }
                         } catch (Exception e) {
                             Tr.error(tc, "LTPA_VALIDATION_KEYS_VALID_UNTIL_DATE_INVALID_FORMAT", validUntilDate, filename);
-                            continue; //Skip this LTPA validationKeys
+                            continue;
                         }
                     }
-
-                    byte[] password = getKeyPasswordBytes(vKeys);
                     boolean isConfiguredValidationKey = Boolean.valueOf(vKeys.getProperty(LTPAConfiguration.INTERNAL_KEY_IS_CONFIGURED_VALIDATION_KEY));
-                    loadLtpaKeysFile(locService, filename, password, true, isConfiguredValidationKey, validUntilDateOdt, tryToReEncryptLtpaKeys);
+                    loadLtpaKeysFile(locService, filename, encryptor, true, isConfiguredValidationKey, validUntilDateOdt, tryToReEncryptLtpaKeys);
                 }
             }
         }
@@ -216,14 +232,12 @@ public class LTPAKeyInfoManager {
      * @throws IOException
      * @throws Exception
      */
-    private void loadLtpaKeysFile(WsLocationAdmin locService, String keyImportFile, @Sensitive byte[] keyPassword, boolean validationKey, boolean isConfiguredValidationKey,
+    private void loadLtpaKeysFile(WsLocationAdmin locService, String keyImportFile, KeyEncryptor encryptor, boolean validationKey, boolean isConfiguredValidationKey,
                                   OffsetDateTime validUntilDateOdt, boolean tryToReEncryptLtpaKeys) throws IOException, Exception {
-        // Need to load the key import file
         if (TraceComponent.isAnyTracingEnabled() && tc.isEventEnabled()) {
-            Tr.event(this, tc, "Loading LTPA " + (validationKey == true ? "validation" : "primary") + "Keys file: " + keyImportFile);
+            Tr.event(this, tc, "Loading LTPA " + (validationKey ? "validation" : "primary") + "Keys file: " + keyImportFile);
         }
         Properties props = null;
-        //Check to see if the LTPA key import file exists, create the keys and file if not
         WsResource ltpaKeyFileResource = getLTPAKeyFileResource(locService, keyImportFile);
 
         if (ltpaKeyFileResource != null) {
@@ -232,8 +246,7 @@ public class LTPAKeyInfoManager {
             if (tc.isDebugEnabled()) {
                 Tr.debug(this, tc, "LTPA key version: " + version);
             }
-            if ((CryptoUtils.isFips140_3Enabled() && "1.0".equals(version)) ||
-                (!CryptoUtils.isFips140_3Enabled() && "2.0".equals(version))) {
+            if (!version.equals(encryptor.getLtpaVersion())) {
                 if (validationKey) {
                     if ("1.0".equals(version))
                         Tr.warning(tc, "LTPA_VALIDATION_KEYS_NEED_TO_REGENERATE", keyImportFile);
@@ -245,17 +258,16 @@ public class LTPAKeyInfoManager {
                     if (restoreLtpaKeyFile(locService, keyImportFile, ltpaKeyFileResource)) {
                         props = loadPropertiesFile(ltpaKeyFileResource);
                     } else {
-                        //regenerate the primary key
-                        props = createPrimaryKeyFile(locService, keyImportFile, keyPassword);
+                        props = createPrimaryKeyFile(locService, keyImportFile, encryptor);
                     }
                 }
             }
 
-        } else if (validationKey) { //validationKeys file does not exist so error
+        } else if (validationKey) {
             Tr.error(tc, "LTPA_KEYS_FILE_DOES_NOT_EXIST", keyImportFile);
             return;
-        } else { //Primary keys file does not exist so create the primary key
-            props = createPrimaryKeyFile(locService, keyImportFile, keyPassword);
+        } else {
+            props = createPrimaryKeyFile(locService, keyImportFile, encryptor);
         }
 
         if (props == null || props.isEmpty()) {
@@ -270,17 +282,16 @@ public class LTPAKeyInfoManager {
         byte[][] keys;
 
         try {
-            keys = decryptKeys(keyPassword, secretKeyStr, privateKeyStr, publicKeyStr);
+            keys = decryptKeys(encryptor, secretKeyStr, privateKeyStr, publicKeyStr);
         } catch (BadPaddingException e) {
-            // only try to re-encrypt if it failed with keystore_password and it's not a configured validationKeys
-            if (!tryToReEncryptLtpaKeys || (validationKey && isConfiguredValidationKey)) {
+            // Re-encrypt on bad-padding is only applicable to the password path, not hardware keys
+            if (!encryptor.supportsLegacyFallback() || !tryToReEncryptLtpaKeys || (validationKey && isConfiguredValidationKey)) {
                 if (TraceComponent.isAnyTracingEnabled() && tc.isEventEnabled()) {
                     Tr.event(this, tc, "Error loading key; " + e);
                 }
                 throw e;
             }
-
-            keys = reEncryptLtpaKey(locService, "WebAS".getBytes(), keyPassword,
+            keys = reEncryptLtpaKey(locService, "WebAS".getBytes(), encryptor,
                                     secretKeyStr, privateKeyStr, publicKeyStr,
                                     keyImportFile, ltpaKeyFileResource, e);
         } catch (Exception e) {
@@ -318,9 +329,8 @@ public class LTPAKeyInfoManager {
     }
 
     @Sensitive
-    private byte[][] decryptKeys(@Sensitive byte[] keyPassword, @Sensitive String secretKeyStr, @Sensitive String privateKeyStr,
+    private byte[][] decryptKeys(KeyEncryptor encryptor, @Sensitive String secretKeyStr, @Sensitive String privateKeyStr,
                                  @Sensitive String publicKeyStr) throws Exception {
-        KeyEncryptor encryptor = new KeyEncryptor(keyPassword);
         byte[] secretKey, privateKey, publicKey;
         // Secret key
         if ((secretKeyStr == null) || (secretKeyStr.length() == 0)) {
@@ -353,18 +363,18 @@ public class LTPAKeyInfoManager {
     }
 
     @Sensitive
-    private byte[][] reEncryptLtpaKey(WsLocationAdmin locService, @Sensitive byte[] keyPasswordToTry, @Sensitive byte[] keyPasswordToReEncryptWith,
+    private byte[][] reEncryptLtpaKey(WsLocationAdmin locService, @Sensitive byte[] keyPasswordToTry, KeyEncryptor encryptorToReEncryptWith,
                                       @Sensitive String secretKeyStr, @Sensitive String privateKeyStr, @Sensitive String publicKeyStr,
                                       String keyImportFile, WsResource ltpaKeyFileResource, Exception originalException) throws Exception {
         try {
             // failed with keystore_password... let's try again with the legacy default password
-            byte[][] keys = decryptKeys(keyPasswordToTry, secretKeyStr, privateKeyStr, publicKeyStr);
+            byte[][] keys = decryptKeys(new PasswordKeyEncryptor(keyPasswordToTry), secretKeyStr, privateKeyStr, publicKeyStr);
 
             // successfully decrypted keys; backup and re-encrypt the keys using keystore_password
             Tr.info(tc, "LTPA_KEYS_REENCRYPT", keyImportFile);
             backupLtpaKeys(locService, ltpaKeyFileResource, keyImportFile);
             LTPAKeyFileCreator creator = new LTPAKeyFileCreatorImpl();
-            creator.createLTPAKeysFile(locService, keyImportFile, keyPasswordToReEncryptWith, keys[0], keys[1], keys[2]);
+            creator.createLTPAKeysFile(locService, keyImportFile, encryptorToReEncryptWith, keys[0], keys[1], keys[2]);
             Tr.info(tc, "LTPA_KEYS_REENCRYPT_SUCCESS", keyImportFile);
             return keys;
         } catch (IOException e) {
@@ -471,12 +481,12 @@ public class LTPAKeyInfoManager {
      * @return
      * @throws Exception
      */
-    private Properties createPrimaryKeyFile(WsLocationAdmin locService, String keyImportFile, @Sensitive byte[] keyPassword) throws Exception {
+    private Properties createPrimaryKeyFile(WsLocationAdmin locService, String keyImportFile, KeyEncryptor encryptor) throws Exception {
         long start = System.currentTimeMillis();
         Tr.info(tc, "LTPA_CREATE_KEYS_START");
 
         LTPAKeyFileCreator creator = new LTPAKeyFileCreatorImpl();
-        Properties props = creator.createLTPAKeysFile(locService, keyImportFile, keyPassword);
+        Properties props = creator.createLTPAKeysFile(locService, keyImportFile, encryptor);
 
         Tr.audit(tc, "LTPA_CREATE_KEYS_COMPLETE", TimestampUtils.getElapsedTime(start), keyImportFile);
         return props;

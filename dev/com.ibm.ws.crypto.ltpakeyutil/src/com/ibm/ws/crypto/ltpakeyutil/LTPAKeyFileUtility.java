@@ -32,15 +32,14 @@ public interface LTPAKeyFileUtility {
 	public static final String VALIDATION_KEYS_PROPERTY = "com.ibm.websphere.ltpa.ltpa_validation_keys";
 
 	/**
-	 * Create the LTPA keys file at the specified location using the specified
-	 * password bytes.
+	 * Create the LTPA keys file at the specified location using the supplied
+	 * {@link KeyEncryptor}.
 	 *
-	 * @param keyFile
-	 * @param keyPasswordBytes
-	 * @return A Properties object containing the various attributes created for the
-	 *         LTPA keys
+	 * @param keyFile   path to the key file to create
+	 * @param encryptor encryptor to use for the key material
+	 * @return A Properties object containing the various attributes created for the LTPA keys
 	 * @throws Exception
 	 */
-	Properties createLTPAKeysFile(String keyFile, byte[] keyPasswordBytes) throws Exception;
+	Properties createLTPAKeysFile(String keyFile, KeyEncryptor encryptor) throws Exception;
 
 }

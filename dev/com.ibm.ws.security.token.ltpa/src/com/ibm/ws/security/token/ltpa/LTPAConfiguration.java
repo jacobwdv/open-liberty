@@ -15,6 +15,7 @@ package com.ibm.ws.security.token.ltpa;
 import java.util.List;
 import java.util.Properties;
 
+import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptorFactory;
 import com.ibm.wsspi.security.ltpa.TokenFactory;
 
 /**
@@ -141,5 +142,13 @@ public interface LTPAConfiguration {
      * @return validation Keys
      */
     List<Properties> getValidationKeys();
-    
+
+    /**
+     * Returns the optional {@link KeyEncryptorFactory} service, or {@code null} if
+     * {@code encryptLtpa} is not configured or the service has not yet been registered.
+     *
+     * @return the hardware key encryptor factory, or {@code null}
+     */
+    KeyEncryptorFactory getKeyEncryptorFactory();
+
 }

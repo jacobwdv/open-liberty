@@ -24,6 +24,9 @@ import com.ibm.websphere.crypto.PasswordUtil;
 import com.ibm.websphere.ras.Tr;
 import com.ibm.websphere.ras.TraceComponent;
 import com.ibm.websphere.ras.annotation.Sensitive;
+import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptor;
+import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptorFactory;
+import com.ibm.ws.crypto.ltpakeyutil.PasswordKeyEncryptor;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAPrivateKey;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAPublicKey;
 import com.ibm.ws.security.token.ltpa.LTPAConfiguration;
@@ -47,16 +50,15 @@ class LTPAKeyCreateTask implements Runnable {
         this.config = config;
     }
 
-    @Sensitive
-    byte[] getKeyPasswordBytes() {
-        return PasswordUtil.passwordDecode(config.getPrimaryKeyPassword()).getBytes();
-    }
-
     private LTPAKeyInfoManager getPreparedLtpaKeyInfoManager() throws Exception {
         LTPAKeyInfoManager keyInfoManager = new LTPAKeyInfoManager();
+        KeyEncryptorFactory factory = config.getKeyEncryptorFactory();
+        KeyEncryptor encryptor = (factory != null)
+            ? factory.createKeyEncryptor()
+            : new PasswordKeyEncryptor(PasswordUtil.passwordDecode(config.getPrimaryKeyPassword()).getBytes());
         keyInfoManager.prepareLTPAKeyInfo(locService,
                                           config.getPrimaryKeyFile(),
-                                          getKeyPasswordBytes(),
+                                          encryptor,
                                           config.getValidationKeys(),
                                           config.getTryToReEncryptLtpaKeys());
         return keyInfoManager;

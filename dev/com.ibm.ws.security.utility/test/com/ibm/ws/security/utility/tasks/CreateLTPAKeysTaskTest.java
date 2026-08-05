@@ -35,6 +35,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import com.ibm.websphere.crypto.PasswordUtil;
+import com.ibm.ws.crypto.ltpakeyutil.KeyEncryptor;
 import com.ibm.ws.crypto.ltpakeyutil.LTPAKeyFileUtility;
 import com.ibm.ws.crypto.util.AesConfigFileParser;
 import com.ibm.ws.security.utility.IFileUtility;
@@ -292,7 +293,7 @@ public class CreateLTPAKeysTaskTest {
                 one(fileUtil).exists("ltpa.keys");
                 will(returnValue(false));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with("ltpa.keys"), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with("ltpa.keys"), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", "ltpa.keys", PASSWORD_CIPHERTEXT)));
             }
@@ -349,7 +350,7 @@ public class CreateLTPAKeysTaskTest {
                 one(stdin).readMaskedText("Re-enter password: ");
                 will(returnValue(PASSWORD_PLAINTEXT));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with("ltpa.keys"), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with("ltpa.keys"), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", "ltpa.keys", PASSWORD_CIPHERTEXT)));
             }
@@ -401,7 +402,7 @@ public class CreateLTPAKeysTaskTest {
                 one(fileUtil).exists("targetLtpaKeysFile");
                 will(returnValue(false));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", "targetLtpaKeysFile", PASSWORD_CIPHERTEXT)));
             }
@@ -427,7 +428,7 @@ public class CreateLTPAKeysTaskTest {
                 one(fileUtil).exists("targetLtpaKeysFile");
                 will(returnValue(false));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", "targetLtpaKeysFile", "{aes}")));
             }
@@ -456,7 +457,7 @@ public class CreateLTPAKeysTaskTest {
                 one(fileUtil).exists("targetLtpaKeysFile");
                 will(returnValue(false));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", "targetLtpaKeysFile", "{aes}")));
             }
@@ -488,7 +489,7 @@ public class CreateLTPAKeysTaskTest {
                     one(fileUtil).exists("targetLtpaKeysFile");
                     will(returnValue(false));
 
-                    one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(byte[].class)));
+                    one(ltpaKeyFileUtil).createLTPAKeysFile(with("targetLtpaKeysFile"), with(any(KeyEncryptor.class)));
 
                     one(stdout).println(with(stringContaining("<ltpa", "targetLtpaKeysFile", "{aes}")));
 
@@ -644,7 +645,7 @@ public class CreateLTPAKeysTaskTest {
                 one(fileUtil).exists(ltpaKeysPath);
                 will(returnValue(false));
 
-                one(ltpaKeyFileUtil).createLTPAKeysFile(with(ltpaKeysPath), with(any(byte[].class)));
+                one(ltpaKeyFileUtil).createLTPAKeysFile(with(ltpaKeysPath), with(any(KeyEncryptor.class)));
 
                 one(stdout).println(with(stringContaining("<ltpa", PASSWORD_CIPHERTEXT)));
             }

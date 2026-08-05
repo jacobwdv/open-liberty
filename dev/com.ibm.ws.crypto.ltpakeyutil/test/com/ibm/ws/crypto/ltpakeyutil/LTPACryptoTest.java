@@ -16,6 +16,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Before;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.fail;
 
 public class LTPACryptoTest {

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1997, 2024 IBM Corporation and others.
+ * Copyright (c) 1997, 2026 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -12,56 +12,46 @@
  *******************************************************************************/
 package com.ibm.ws.crypto.ltpakeyutil;
 
-import java.security.MessageDigest;
-
-import com.ibm.ws.common.crypto.CryptoUtils;
-
 /**
- * A package local class for performing encryption and decryption of keys based
- * on admin's password
+ * Abstraction for encrypting and decrypting LTPA key material.
+ *
+ * <p>The standard implementation is {@link PasswordKeyEncryptor}, which derives a symmetric key
+ * from an admin password via message-digest. Platform-specific implementations (e.g. for
+ * hardware-backed keys on z/OS) may be registered as OSGi services via {@link KeyEncryptorFactory}
+ * and must honour the contract that {@link java.security.Key#getEncoded()} is never called on
+ * any opaque hardware key.
  */
-public class KeyEncryptor {
+public interface KeyEncryptor {
 
-	private static final boolean fipsEnabled = CryptoUtils.isFips140_3Enabled();
-	private static final int size = (fipsEnabled ? 32 : 24);
-	private static final String CIPHER = CryptoUtils.getCipher();
-	private final byte[] key;
+    /**
+     * Encrypts the given plaintext key material.
+     *
+     * @param data The plaintext bytes to encrypt
+     * @return The encrypted bytes
+     * @throws Exception if encryption fails
+     */
+    byte[] encrypt(byte[] data) throws Exception;
 
-	/**
-	 * A KeyEncryptor constructor.
-	 *
-	 * @param password The key password
-	 */
-	public KeyEncryptor(byte[] password) throws Exception {
-		MessageDigest md = MessageDigest.getInstance(CryptoUtils.MESSAGE_DIGEST_ALGORITHM);
-		byte[] digest = md.digest(password);
-		key = new byte[size];
-		System.arraycopy(digest, 0, key, 0, digest.length);
-		if (!fipsEnabled) {
-			key[20] = (byte) 0x00;
-			key[21] = (byte) 0x00;
-			key[22] = (byte) 0x00;
-			key[23] = (byte) 0x00;
-		}
-	}
+    /**
+     * Decrypts the given ciphertext key material.
+     *
+     * @param encryptedData The ciphertext bytes to decrypt
+     * @return The decrypted plaintext bytes
+     * @throws Exception if decryption fails
+     */
+    byte[] decrypt(byte[] encryptedData) throws Exception;
 
-	/**
-	 * Decrypt the key.
-	 *
-	 * @param encryptedKey The encrypted key
-	 * @return The decrypted key
-	 */
-	public byte[] decrypt(byte[] encryptedKey) throws Exception {
-		return LTPACrypto.decrypt(encryptedKey, key, CIPHER);
-	}
+    /**
+     * Returns the LTPA key file version string this encryptor produces.
+     * Password-based encryptors return {@code "1.0"} normally or {@code "2.0"} when FIPS
+     * 140-3 is enabled. Hardware-backed encryptors always return {@code "2.0"}.
+     */
+    String getLtpaVersion();
 
-	/**
-	 * Encrypt the key
-	 *
-	 * @param key The key
-	 * @return The encrypted key
-	 */
-	public byte[] encrypt(byte[] key) throws Exception {
-		return LTPACrypto.encrypt(key, this.key, CIPHER);
-	}
+    /**
+     * Returns {@code true} if this encryptor supports falling back to the legacy
+     * {@code "WebAS"} default password when a {@code BadPaddingException} is encountered
+     * during key load. Hardware-backed encryptors return {@code false}.
+     */
+    boolean supportsLegacyFallback();
 }
