@@ -70,7 +70,7 @@ public class JNDIEntry {
             return;
         }
         String value = originalValue;
-        if (decode) {
+        if (decode && PasswordUtil.isEncrypted(originalValue)) {
             try {
                 value = PasswordUtil.decode(originalValue);
             } catch (Exception e) {
@@ -116,12 +116,14 @@ public class JNDIEntry {
 
         @Override
         public Object getService(Bundle bundle, ServiceRegistration<Object> registration) {
-            try {
-                String decodedValue = PasswordUtil.decode(value);
-                Object parsedValue = LiteralParser.parse(decodedValue);
-                return parsedValue;
-            } catch (Exception e) {
-                Tr.error(tc, "jndi.decode.failed", value, e);
+            if (PasswordUtil.isEncrypted(value)) {
+                try {
+                    String decodedValue = PasswordUtil.decode(value);
+                    Object parsedValue = LiteralParser.parse(decodedValue);
+                    return parsedValue;
+                } catch (Exception e) {
+                    Tr.error(tc, "jndi.decode.failed", value, e);
+                }
             }
             return value;
         }
