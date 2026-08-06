@@ -217,7 +217,7 @@ public class EncodeTask extends BaseCommandTask {
         if (encoding != null && encoding.trim().equalsIgnoreCase("aes")) {
 
             // CKDS path: type=CKDS + label only, no keyring needed.
-            // encipher_internal() detects hasSecretKeyResolver() and forces AES_V2 automatically.
+            // encipher_internal() consults AESKeyManager.getSecretKeyResolver() and uses AES_V2 automatically.
             if ("CKDS".equalsIgnoreCase(type) && label != null && !label.isEmpty()) {
                 AESKeyManager.setSecretKeyResolver(new CKDSSecretKeyResolver(label));
                 return p;

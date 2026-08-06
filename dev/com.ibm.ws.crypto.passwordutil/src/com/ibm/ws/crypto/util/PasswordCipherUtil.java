@@ -58,6 +58,7 @@ import com.ibm.ws.crypto.util.custom.CustomUtils;
 import com.ibm.wsspi.kernel.service.utils.AtomicServiceReference;
 import com.ibm.wsspi.security.crypto.CustomPasswordEncryption;
 import com.ibm.wsspi.security.crypto.EncryptedInfo;
+import com.ibm.wsspi.security.crypto.SecretKeyResolver;
 
 /**
  * Utility class for password enciphering and deciphering.
@@ -326,11 +327,17 @@ public class PasswordCipherUtil {
 
     private static byte[] aesDecipherCommon(String cipher, AESKeyManager.KeyVersion kv, AlgorithmParameterSpec ps, byte[] cipherText, int start,
                                             int len) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
+        return aesDecipherCommon(cipher, AESKeyManager.getKey(kv, null), ps, cipherText, start, len);
+    }
+
+    private static byte[] aesDecipherCommon(String cipher, Key key, AlgorithmParameterSpec ps, byte[] cipherText, int start,
+                                            int len) throws InvalidPasswordCipherException, UnsupportedCryptoAlgorithmException {
         try {
-            Key key = AESKeyManager.getKey(kv, null);
             Cipher c = Cipher.getInstance(cipher);
             c.init(Cipher.DECRYPT_MODE, key, ps);
             return c.doFinal(cipherText, start, len);
+        } catch (NoSuchAlgorithmException e) {
+            throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
         } catch (NoSuchPaddingException e) {
             throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
         } catch (InvalidKeyException e) {
@@ -385,14 +392,14 @@ public class PasswordCipherUtil {
                 cryptoKey = properties.get(PasswordUtil.PROPERTY_CRYPTO_KEY);
                 base64Key = properties.get(PasswordUtil.PROPERTY_AES_KEY);
             }
-            // If a hardware SecretKeyResolver (e.g. CKDS) is active, force AES_V2 regardless
-            // of what the caller supplied in the properties map. This covers application calls
-            // such as PasswordUtil.passwordEncode() that pass a null properties map.
-            // The sentinel value is never decoded — AESKeyManager.getKey(AES_V2, …) intercepts it.
-            if (base64Key == null && AESKeyManager.hasSecretKeyResolver()) {
-                base64Key = "CKDS";
-            }
-            if (base64Key != null) {
+            SecretKeyResolver skr = AESKeyManager.getSecretKeyResolver();
+            if (skr != null) {
+                // Hardware-backed key (e.g. ICSF/CKDS): bypass software key derivation entirely
+                // and encrypt using AES_V2 wire format with the resolver key directly.
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using hardware SecretKeyResolver (AES_V2)");
+                info = aesEncipherCommon(decrypted_bytes, null, AESKeyManager.KeyVersion.AES_V2, skr);
+            } else if (base64Key != null) {
                 if (logger.isLoggable(Level.FINE))
                     logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);
                 info = aesEncipherV2(decrypted_bytes, base64Key);
@@ -711,7 +718,20 @@ public class PasswordCipherUtil {
         int ivLen = encrypted_bytes[1];
         int cipherBytesStart = ivLen + 2;
         GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 2, ivLen);
-        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, AESKeyManager.KeyVersion.AES_V2, iv, encrypted_bytes, cipherBytesStart,
+
+        Key key;
+        SecretKeyResolver skr = AESKeyManager.getSecretKeyResolver();
+        if (skr != null) {
+            try {
+                key = skr.getKey();
+            } catch (Exception e) {
+                throw new InvalidKeySpecException("Failed to obtain hardware key from SecretKeyResolver", e);
+            }
+        } else {
+            key = AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V2, null);
+        }
+
+        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, key, iv, encrypted_bytes, cipherBytesStart,
                                              encrypted_bytes.length - cipherBytesStart);
         return removeSeed(decrypted);
     }
@@ -744,6 +764,13 @@ public class PasswordCipherUtil {
     private static EncryptedInfo aesEncipherCommon(byte[] decrypted_bytes,
                                                    String key,
                                                    AESKeyManager.KeyVersion version) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
+        return aesEncipherCommon(decrypted_bytes, key, version, null);
+    }
+
+    private static EncryptedInfo aesEncipherCommon(byte[] decrypted_bytes,
+                                                   String key,
+                                                   AESKeyManager.KeyVersion version,
+                                                   SecretKeyResolver skr) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
         EncryptedInfo info = null;
         SecureRandom rand = new SecureRandom();
         byte[] preEncrypted = aesSetSeed(decrypted_bytes, rand);
@@ -751,7 +778,8 @@ public class PasswordCipherUtil {
             Cipher c = Cipher.getInstance(CryptoUtils.AES_GCM_CIPHER);
             // 128 is the GCM tag length. 128 is the MAX.
             GCMParameterSpec ps = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, rand.generateSeed(c.getBlockSize()));
-            c.init(Cipher.ENCRYPT_MODE, AESKeyManager.getKey(version, key), ps);
+            Key resolvedKey = (skr != null) ? skr.getKey() : AESKeyManager.getKey(version, key);
+            c.init(Cipher.ENCRYPT_MODE, resolvedKey, ps);
             byte[] encrypted_bytes = c.doFinal(preEncrypted);
             if (encrypted_bytes != null) {
                 byte[] ivBytes = ps.getIV();
