@@ -804,6 +804,8 @@ public class PasswordCipherUtil {
             throw (UnsupportedCryptoAlgorithmException) new UnsupportedCryptoAlgorithmException().initCause(e);
         } catch (InvalidAlgorithmParameterException e) {
             throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
+        } catch (Exception e) {
+            throw (InvalidPasswordCipherException) new InvalidPasswordCipherException().initCause(e);
         }
         return info;
     }
