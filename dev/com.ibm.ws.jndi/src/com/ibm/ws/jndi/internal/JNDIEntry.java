@@ -85,7 +85,7 @@ public class JNDIEntry {
 	 * @param decode if true, val is decoded if it's encrypted, otherwise val is parsed directly.
 	 * @return
 	 */
-	private static Object parseLiteral(String val, boolean decode) {
+	protected static Object parseLiteral(String val, boolean decode) {
 		String decodedVal = val;
         if (decode && PasswordUtil.isEncrypted(val)) {
             try {
