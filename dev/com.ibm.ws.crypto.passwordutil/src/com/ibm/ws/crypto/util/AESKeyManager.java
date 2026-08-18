@@ -42,7 +42,7 @@ public class AESKeyManager {
     private static final AtomicReference<KeyStringResolver> _resolver = new AtomicReference<KeyStringResolver>();
     private static final AtomicReference<SecretKeyResolver> _secretKeyResolver = new AtomicReference<SecretKeyResolver>();
 
-    public static enum KeyVersion {
+    public enum KeyVersion {
 
         // FIPS 140-3: Algorithm assessment complete; no changes required.
         // AES_V0 is only used for backward compatibility, newly created passwords will use AES_V1. If FIPS is enabled, AES_V0 will not be tolerated
@@ -60,6 +60,7 @@ public class AESKeyManager {
         public final int keyLength;
         private final byte[] salt;
         private final String resolverProperty;
+        final DefaultSecretKeyResolver defaultResolver;
 
         private KeyVersion(String alg, int iterations, int keyLength, byte[] salt, String resolverProperty) {
             this.alg = alg;
@@ -67,6 +68,7 @@ public class AESKeyManager {
             this.keyLength = keyLength;
             this.salt = salt;
             this.resolverProperty = resolverProperty;
+            this.defaultResolver = new DefaultSecretKeyResolver(this);
         }
 
         /**
@@ -81,14 +83,13 @@ public class AESKeyManager {
             KeyHolder holder = _key.get();
             if (holder == null || !!!holder.matches(keyChars)) {
                 byte[] data;
-                byte[] iv;
                 if (CryptoUtils.ENCRYPT_ALGORITHM_AES.equals(alg)) {
                     data = decodeAesBase64Key(keyChars);
                 } else {
                     data = buildAesKeyWithPbkdf2(keyChars);
                 }
-                iv = Arrays.copyOfRange(data, 0, 16);
-                KeyHolder holder2 = new KeyHolder(keyChars, new SecretKeySpec(data, "AES"), new IvParameterSpec(iv));
+                byte[] iv = Arrays.copyOfRange(data, 0, CryptoUtils.AES_128_KEY_LENGTH_BYTES);
+                KeyHolder holder2 = new KeyHolder(keyChars, new SecretKeySpec(data, CryptoUtils.ENCRYPT_ALGORITHM_AES), new IvParameterSpec(iv));
                 _key.compareAndSet(holder, holder2);
                 // Still use this holder for returns even if I do not end up caching it.
                 holder = holder2;
@@ -102,12 +103,16 @@ public class AESKeyManager {
          * @throws InvalidKeySpecException if keyChars does not represent a valid base64 value.
          */
         public byte[] decodeAesBase64Key(char[] keyChars) throws InvalidKeySpecException {
-            byte[] data;
-            if (keyChars == null || PROPERTY_WLP_BASE64_AES_ENCRYPTION_KEY.equals(new String(keyChars))) {
+            if (keyChars == null) {
                 throw new InvalidKeySpecException(MessageUtils.getMessage("AESKEYMANAGER_BASE64_VARIABLE_NOT_SET"));
             }
+            String keyString = new String(keyChars);
+            if (PROPERTY_WLP_BASE64_AES_ENCRYPTION_KEY.equals(keyString)) {
+                throw new InvalidKeySpecException(MessageUtils.getMessage("AESKEYMANAGER_BASE64_VARIABLE_NOT_SET"));
+            }
+            byte[] data;
             try {
-                data = Base64.getDecoder().decode(new String(keyChars));
+                data = Base64.getDecoder().decode(keyString);
             } catch (IllegalArgumentException iae) {
                 throw new InvalidKeySpecException(MessageUtils.getMessage("AESKEYMANAGER_NOT_BASE64_EXCEPTION"), iae);
             }
@@ -131,9 +136,9 @@ public class AESKeyManager {
         private final Key key;
         private final IvParameterSpec iv;
 
-        public KeyHolder(char[] kc, Key k, IvParameterSpec ivParameterSpec) {
-            keyChars = kc;
-            key = k;
+        public KeyHolder(char[] keyChars, Key key, IvParameterSpec ivParameterSpec) {
+            this.keyChars = keyChars;
+            this.key = key;
             iv = ivParameterSpec;
         }
 
@@ -180,8 +185,18 @@ public class AESKeyManager {
      * @return the resolved Key as char[]
      */
     public static char[] getKeyCharsUsingResolver(KeyVersion version, String key) {
-        char[] keyChars = _resolver.get().getKey(key == null ? version.resolverProperty : key);
-        return keyChars;
+        return _resolver.get().getKey(key == null ? version.resolverProperty : key);
+    }
+
+    /**
+     * Returns the per-version default {@link DefaultSecretKeyResolver}.
+     * For V0 and V1 it derives the key via PBKDF2; for V2 it Base64-decodes the key.
+     *
+     * @param version the KeyVersion whose default resolver to retrieve
+     * @return the DefaultSecretKeyResolver for that version
+     */
+    static DefaultSecretKeyResolver getDefaultResolver(KeyVersion version) {
+        return version.defaultResolver;
     }
 
     /**
@@ -209,7 +224,11 @@ public class AESKeyManager {
     }
 
     /**
-     * @param object
+     * Sets the {@link KeyStringResolver} used to look up key strings by name (e.g. from
+     * server configuration variables). Pass {@code null} to restore the default no-op resolver
+     * that returns the key string as-is.
+     *
+     * @param resolver the resolver to install, or {@code null} to revert to the default
      */
     public static void setKeyStringResolver(KeyStringResolver resolver) {
         if (resolver == null) {
@@ -225,20 +244,47 @@ public class AESKeyManager {
     }
 
     /**
-     * @param cryptoKey
-     * @return
+     * Returns the {@link IvParameterSpec} for the given key version and raw key string.
+     *
+     * @param version   the key version to use
+     * @param cryptoKey the raw key string, or {@code null} to use the version's configured property
+     * @return the IV derived from the resolved key
      */
     public static IvParameterSpec getIV(KeyVersion version, String cryptoKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
         return getHolder(version, cryptoKey).getIv();
     }
 
     /**
-     * @param cryptoKey
-     * @return
+     * @deprecated Use {@link #getIV(KeyVersion, String)} with {@link KeyVersion#AES_V0}.
      */
     @Deprecated
     public static IvParameterSpec getIV(String cryptoKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
         return getHolder(KeyVersion.AES_V0, cryptoKey).getIv();
+    }
+
+    /**
+     * Returns the appropriate {@link SecretKeyResolver} for the given version and caller-supplied inputs,
+     * applying the following priority:
+     * <ol>
+     *   <li>If an explicit {@code key} string is provided, wraps {@link #getKey(KeyVersion, String)} in an
+     *       anonymous resolver (user-supplied key always wins, e.g. {@code securityUtility encode --key}).</li>
+     *   <li>If a hardware-backed {@code skr} is provided, returns it as-is.</li>
+     *   <li>Otherwise, returns the per-version {@link DefaultSecretKeyResolver}.</li>
+     * </ol>
+     *
+     * @param version the AES key version
+     * @param key     an explicit key string, or {@code null} to fall through to the next priority
+     * @param skr     a hardware-backed resolver, or {@code null} to fall through to the default
+     * @return the resolved {@link SecretKeyResolver}; never {@code null}
+     */
+    static SecretKeyResolver resolveKeyFor(KeyVersion version, String key, SecretKeyResolver skr) {
+        if (key != null) {
+            return () -> getKey(version, key);
+        } else if (skr != null) {
+            return skr;
+        } else {
+            return getDefaultResolver(version);
+        }
     }
 
 }
