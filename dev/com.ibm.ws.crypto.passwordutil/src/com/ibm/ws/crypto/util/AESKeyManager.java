@@ -40,7 +40,6 @@ public class AESKeyManager {
     public static final String PROPERTY_WLP_BASE64_AES_ENCRYPTION_KEY = "${" + NAME_WLP_BASE64_AES_ENCRYPTION_KEY + "}";
 
     private static final AtomicReference<KeyStringResolver> _resolver = new AtomicReference<KeyStringResolver>();
-    private static final AtomicReference<SecretKeyResolver> _secretKeyResolver = new AtomicReference<SecretKeyResolver>();
 
     public enum KeyVersion {
 
@@ -60,7 +59,7 @@ public class AESKeyManager {
         public final int keyLength;
         private final byte[] salt;
         private final String resolverProperty;
-        final DefaultSecretKeyResolver defaultResolver;
+        final AtomicReference<SecretKeyResolver> resolver;
 
         private KeyVersion(String alg, int iterations, int keyLength, byte[] salt, String resolverProperty) {
             this.alg = alg;
@@ -68,7 +67,7 @@ public class AESKeyManager {
             this.keyLength = keyLength;
             this.salt = salt;
             this.resolverProperty = resolverProperty;
-            this.defaultResolver = new DefaultSecretKeyResolver(this);
+            this.resolver = new AtomicReference<>(new DefaultSecretKeyResolver(this));
         }
 
         /**
@@ -189,38 +188,28 @@ public class AESKeyManager {
     }
 
     /**
-     * Returns the per-version default {@link DefaultSecretKeyResolver}.
-     * For V0 and V1 it derives the key via PBKDF2; for V2 it Base64-decodes the key.
-     *
-     * @param version the KeyVersion whose default resolver to retrieve
-     * @return the DefaultSecretKeyResolver for that version
-     */
-    static DefaultSecretKeyResolver getDefaultResolver(KeyVersion version) {
-        return version.defaultResolver;
-    }
-
-    /**
-     * Sets a hardware-backed {@link SecretKeyResolver} (e.g. ICSF/CKDS via IBMJCECCA).
-     * When non-null, {@link com.ibm.ws.crypto.util.PasswordCipherUtil} will use the resolver
-     * directly for all AES_V2 encrypt and decrypt operations instead of the software base64-key path.
+     * Sets a hardware-backed {@link SecretKeyResolver} (e.g. ICSF/CKDS via IBMJCECCA) directly
+     * on {@link KeyVersion#AES_V2}. When non-null, all AES_V2 encrypt and decrypt operations will
+     * use the supplied resolver. Pass {@code null} to revert to the software base64-key path.
      *
      * @param resolver the resolver to install, or null to revert to the standard char[]-based path
      */
     public static void setSecretKeyResolver(SecretKeyResolver resolver) {
-        _secretKeyResolver.set(resolver);
+        SecretKeyResolver effective = (resolver != null) ? resolver : new DefaultSecretKeyResolver(KeyVersion.AES_V2);
+        KeyVersion.AES_V2.resolver.set(effective);
         // Invalidate any cached AES_V2 key so the next encrypt/decrypt starts clean
         KeyVersion.AES_V2._key.set(null);
     }
 
     /**
-     * Returns the active hardware-backed {@link SecretKeyResolver}, or {@code null} if none is installed.
-     * Used by {@link com.ibm.ws.crypto.util.PasswordCipherUtil} to decide whether to use the hardware
-     * path or the standard base64-key derivation path for AES_V2 operations.
+     * Returns the active hardware-backed {@link SecretKeyResolver} if one is installed,
+     * or {@code null} if AES_V2 is currently using the default software path.
      *
-     * @return the active SecretKeyResolver, or null
+     * @return the active hardware SecretKeyResolver, or null
      */
     public static SecretKeyResolver getSecretKeyResolver() {
-        return _secretKeyResolver.get();
+        SecretKeyResolver skr = KeyVersion.AES_V2.resolver.get();
+        return (skr instanceof DefaultSecretKeyResolver) ? null : skr;
     }
 
     /**
@@ -260,31 +249,6 @@ public class AESKeyManager {
     @Deprecated
     public static IvParameterSpec getIV(String cryptoKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
         return getHolder(KeyVersion.AES_V0, cryptoKey).getIv();
-    }
-
-    /**
-     * Returns the appropriate {@link SecretKeyResolver} for the given version and caller-supplied inputs,
-     * applying the following priority:
-     * <ol>
-     *   <li>If an explicit {@code key} string is provided, wraps {@link #getKey(KeyVersion, String)} in an
-     *       anonymous resolver (user-supplied key always wins, e.g. {@code securityUtility encode --key}).</li>
-     *   <li>If a hardware-backed {@code skr} is provided, returns it as-is.</li>
-     *   <li>Otherwise, returns the per-version {@link DefaultSecretKeyResolver}.</li>
-     * </ol>
-     *
-     * @param version the AES key version
-     * @param key     an explicit key string, or {@code null} to fall through to the next priority
-     * @param skr     a hardware-backed resolver, or {@code null} to fall through to the default
-     * @return the resolved {@link SecretKeyResolver}; never {@code null}
-     */
-    static SecretKeyResolver resolveKeyFor(KeyVersion version, String key, SecretKeyResolver skr) {
-        if (key != null) {
-            return () -> getKey(version, key);
-        } else if (skr != null) {
-            return skr;
-        } else {
-            return getDefaultResolver(version);
-        }
     }
 
 }

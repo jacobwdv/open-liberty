@@ -307,7 +307,7 @@ public class PasswordCipherUtil {
     }
 
     private static byte[] aesDecipherV0(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
-        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_CBC_CIPHER, AESKeyManager.resolveKeyFor(AES_V0, null, null),
+        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_CBC_CIPHER, AES_V0.resolver.get(),
                                              AESKeyManager.getIV(AES_V0, null), encrypted_bytes, 1, encrypted_bytes.length - 1);
         return removeSeed(decrypted);
     }
@@ -316,7 +316,7 @@ public class PasswordCipherUtil {
         int ivLen = encrypted_bytes[1];
         int cipherBytesStart = ivLen + 2;
         GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 2, ivLen);
-        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, AESKeyManager.resolveKeyFor(AES_V1, null, null), iv, encrypted_bytes, cipherBytesStart,
+        byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER, AES_V1.resolver.get(), iv, encrypted_bytes, cipherBytesStart,
                                              encrypted_bytes.length - cipherBytesStart);
         return removeSeed(decrypted);
     }
@@ -397,18 +397,21 @@ public class PasswordCipherUtil {
                 cryptoKey = properties.get(PasswordUtil.PROPERTY_CRYPTO_KEY);
                 base64Key = properties.get(PasswordUtil.PROPERTY_AES_KEY);
             }
-            SecretKeyResolver skr = AESKeyManager.getSecretKeyResolver();
-            if (skr != null) {
+            if (base64Key != null) {
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);
+                info = aesEncipherV2(decrypted_bytes, base64Key);
+            } else if (cryptoKey != null) {
+                if (logger.isLoggable(Level.FINE))
+                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_CRYPTO_KEY);
+                info = aesEncipherV1(decrypted_bytes, cryptoKey);
+            } else if (AESKeyManager.getSecretKeyResolver() != null) {
                 // Hardware-backed key (e.g. ICSF/CKDS): bypass software key derivation entirely
                 // and encrypt using AES_V2 wire format with the resolver key directly.
                 if (logger.isLoggable(Level.FINE))
                     logger.fine("Encrypting password using hardware SecretKeyResolver (AES_V2)");
                 info = aesEncipherCommon(decrypted_bytes, AESKeyManager.KeyVersion.AES_V2,
-                                         AESKeyManager.resolveKeyFor(AESKeyManager.KeyVersion.AES_V2, null, skr));
-            } else if (base64Key != null) {
-                if (logger.isLoggable(Level.FINE))
-                    logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_AES_KEY);
-                info = aesEncipherV2(decrypted_bytes, base64Key);
+                                         AESKeyManager.getSecretKeyResolver());
             } else {
                 if (logger.isLoggable(Level.FINE))
                     logger.fine("Encrypting password using " + PasswordUtil.PROPERTY_CRYPTO_KEY);
@@ -582,15 +585,7 @@ public class PasswordCipherUtil {
                                                byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
         SecureRandom rand = new SecureRandom();
         byte[] preEncrypted = aesSetSeed(decrypted_bytes, rand);
-        Key encKey;
-        try {
-            encKey = (cryptoKey != null) ? AESKeyManager.getKey(AES_V0, cryptoKey)
-                                         : AESKeyManager.getDefaultResolver(AES_V0).getKey();
-        } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new InvalidKeySpecException("Failed to obtain key for AES_V0", e);
-        }
+        Key encKey = AESKeyManager.getKey(AES_V0, cryptoKey);
         try {
             Cipher c = Cipher.getInstance(CryptoUtils.AES_CBC_CIPHER);
             c.init(Cipher.ENCRYPT_MODE, encKey, AESKeyManager.getIV(AES_V0, cryptoKey));
@@ -653,7 +648,7 @@ public class PasswordCipherUtil {
     private static EncryptedInfo aesEncipherV1(byte[] decrypted_bytes,
                                                String cryptoKey) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
         return aesEncipherCommon(decrypted_bytes, AESKeyManager.KeyVersion.AES_V1,
-                                 AESKeyManager.resolveKeyFor(AESKeyManager.KeyVersion.AES_V1, cryptoKey, null));
+                                 () -> AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V1, cryptoKey));
     }
 
     /**
@@ -725,9 +720,8 @@ public class PasswordCipherUtil {
 
     private static EncryptedInfo aesEncipherV2(byte[] decrypted_bytes,
                                                String base64Key) throws InvalidKeySpecException, UnsupportedCryptoAlgorithmException, InvalidPasswordCipherException {
-        // skr is null here: encipher_internal already handles the hardware path before reaching this method
         return aesEncipherCommon(decrypted_bytes, AESKeyManager.KeyVersion.AES_V2,
-                                 AESKeyManager.resolveKeyFor(AESKeyManager.KeyVersion.AES_V2, base64Key, null));
+                                 () -> AESKeyManager.getKey(AESKeyManager.KeyVersion.AES_V2, base64Key));
     }
 
     private static byte[] aesDecipherV2(byte[] encrypted_bytes) throws InvalidKeySpecException, InvalidPasswordCipherException, NoSuchAlgorithmException, UnsupportedCryptoAlgorithmException {
@@ -735,7 +729,7 @@ public class PasswordCipherUtil {
         int cipherBytesStart = ivLen + 2;
         GCMParameterSpec iv = new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH, encrypted_bytes, 2, ivLen);
         byte[] decrypted = aesDecipherCommon(CryptoUtils.AES_GCM_CIPHER,
-                                             AESKeyManager.resolveKeyFor(AESKeyManager.KeyVersion.AES_V2, null, AESKeyManager.getSecretKeyResolver()),
+                                             AESKeyManager.KeyVersion.AES_V2.resolver.get(),
                                              iv, encrypted_bytes, cipherBytesStart, encrypted_bytes.length - cipherBytesStart);
         return removeSeed(decrypted);
     }
