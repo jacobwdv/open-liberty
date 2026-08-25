@@ -120,12 +120,16 @@ encode.option-desc.keyring=\
 encode.option-key.keyringType=\
 \ \ \ \ --keyringType=[keyringType]
 encode.option-desc.keyringType=\
-\tSpecify the SAF keyring type of the keyring where the AES encryption\n\
-\tis located.
+\tSpecify the key storage type. Use JCERACFKS, JCECCARACFKS, or\n\
+\tJCEHYBRIDRACFKS for a SAF keyring. Use CKDS to use a hardware\n\
+\tAES key from the ICSF Cryptographic Key Data Set; in this case\n\
+\t--keyring is not required.
 encode.option-key.keyLabel=\
 \ \ \ \ --keyLabel=[keyLabel]
 encode.option-desc.keyLabel=\
-\tSpecify the label of the SAF certificate of the AES encryption key.
+\tFor SAF keyring types, specify the label of the certificate within\n\
+\tthe keyring. For CKDS, specify the label of the AES key in the\n\
+\tICSF Cryptographic Key Data Set.
 
 
 
